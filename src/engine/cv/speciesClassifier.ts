@@ -44,6 +44,7 @@ function normalizeToken(str: string): string {
 
 // Common aliases and synonyms for fish identification
 const SPECIES_EXTRA_ALIASES: Record<string, string[]> = {
+  mahimahi: ['mahimahi', 'mahi-mahi', 'mahi_mahi', 'dolphinfish', 'dorado', 'coryphaena', 'hippurus', 'عنزه', 'ماهیعنزه', 'ماهیماهی', 'مایمای', 'دلفینماهی', 'شمس'],
   zardeh: ['zardeh', 'kawakawa', 'euthynnus', 'affinis', 'mackereltuna', 'زرده', 'ماهیزرده', 'تنزرده', 'تندریا'],
   rashgoo: ['rashgoo', 'fourfinger', 'threadfin', 'tetradactylum', 'راشگو', 'ماهیراشگو'],
   talal: ['talal', 'kanagurta', 'indianmackerel', 'طلال', 'ماهیطلال'],
@@ -317,8 +318,10 @@ export async function classifyFishPhoto(
     confidence = Math.floor(95 + Math.random() * 3); // 95% - 98%
   } else if (topRawScore > 75) {
     confidence = Math.min(96, Math.floor(88 + (topRawScore - 75) * 0.22));
+  } else if (topRawScore > 45) {
+    confidence = Math.min(87, Math.floor(75 + (topRawScore - 45) * 0.4));
   } else {
-    confidence = Math.min(92, Math.max(82, Math.floor(76 + topRawScore * 0.18)));
+    confidence = Math.min(74, Math.max(55, Math.floor(55 + topRawScore * 0.4)));
   }
 
   // Pick top 2 distinct alternatives from the highest scoring list

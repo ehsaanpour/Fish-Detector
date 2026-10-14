@@ -104,7 +104,17 @@ async function runTests() {
   }
   console.log('✅ Passed: Kilka successfully identified!');
 
-  console.log('\n🎉 ALL 11 CLASSIFIER VERIFICATION TESTS PASSED!');
+  // Test 12: Mahi-Mahi fish (the user report case!)
+  console.log('\n[TEST 12] Testing Mahi-Mahi Identification (ماهی‌ماهی / عنزه)...');
+  const mahimahiPred = await classifyFishPhoto('assets/fish/mahimahi.jpg', 'MahiMahi_ocean_catch.jpg');
+  console.log(`Top match: ${mahimahiPred.topMatch.species.nameFa} (${mahimahiPred.topMatch.species.id}) - Confidence: ${mahimahiPred.topMatch.confidence}%`);
+  console.log(`Distinguishing features:`, mahimahiPred.topMatch.distinguishingFeaturesFa);
+  if (mahimahiPred.topMatch.species.id !== 'mahimahi') {
+    throw new Error(`Expected mahimahi, got ${mahimahiPred.topMatch.species.id}`);
+  }
+  console.log('✅ Passed: Mahi-Mahi (ماهی عنزه / ماهی‌ماهی) successfully identified!');
+
+  console.log('\n🎉 ALL 12 CLASSIFIER VERIFICATION TESTS PASSED!');
 }
 
 runTests().catch((err) => {

@@ -1,4 +1,4 @@
-// Precomputed visual and biometric fingerprints for all 45 fish species
+// Precomputed visual and biometric fingerprints for all 46 fish species
 export interface FishVisualFingerprint {
   dHash: string;
   avgR: number;
@@ -162,13 +162,6 @@ export const FISH_FINGERPRINTS: Record<string, FishVisualFingerprint> = {
     "avgR": 211,
     "avgG": 210
   },
-  "european_seabass": {
-    "avgB": 84,
-    "dHash": "0010101100001011010010110000001100001110000111001110000001100100",
-    "aspectRatio": 1.51,
-    "avgR": 56,
-    "avgG": 66
-  },
   "halva_siah": {
     "avgB": 73,
     "dHash": "0000011000110010011100101101110110001110000111010111101000010011",
@@ -176,12 +169,12 @@ export const FISH_FINGERPRINTS: Record<string, FishVisualFingerprint> = {
     "avgR": 123,
     "avgG": 162
   },
-  "sakan": {
-    "avgB": 195,
-    "dHash": "0000010000000000001100011111000111001011111010010101100101000000",
-    "aspectRatio": 2.56,
-    "avgR": 195,
-    "avgG": 196
+  "european_seabass": {
+    "avgB": 84,
+    "dHash": "0010101100001011010010110000001100001110000111001110000001100100",
+    "aspectRatio": 1.51,
+    "avgR": 56,
+    "avgG": 66
   },
   "dolmi": {
     "avgB": 161,
@@ -260,6 +253,13 @@ export const FISH_FINGERPRINTS: Record<string, FishVisualFingerprint> = {
     "avgR": 134,
     "avgG": 137
   },
+  "sakan": {
+    "avgB": 195,
+    "dHash": "0000010000000000001100011111000111001011111010010101100101000000",
+    "aspectRatio": 2.56,
+    "avgR": 195,
+    "avgG": 196
+  },
   "sangsar": {
     "avgB": 181,
     "dHash": "0100000001001000010011000001011000000111001001110000011101000000",
@@ -287,6 +287,13 @@ export const FISH_FINGERPRINTS: Record<string, FishVisualFingerprint> = {
     "aspectRatio": 1.79,
     "avgR": 225,
     "avgG": 227
+  },
+  "mahimahi": {
+    "avgB": 211,
+    "dHash": "0000000000000000011000001110000111011100110110011101000000000000",
+    "aspectRatio": 1.5,
+    "avgR": 221,
+    "avgG": 226
   },
   "soltan_ebrahim": {
     "avgB": 222,

@@ -29,6 +29,7 @@ export const FISH_IMAGES: Record<string, any> = {
   dolmi: require('../../assets/fish/dolmi.jpg'),
   sarem: require('../../assets/fish/sarem.jpg'),
   meyd: require('../../assets/fish/meyd.jpg'),
+  mahimahi: require('../../assets/fish/mahimahi.jpg'),
   zardeh: require('../../assets/fish/zardeh.jpg'),
   talal: require('../../assets/fish/talal.jpg'),
   sobaity: require('../../assets/fish/sobaity.jpg'),
