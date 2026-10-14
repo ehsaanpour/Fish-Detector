@@ -12,7 +12,7 @@ import { useAppTheme } from '../theme/ThemeContext';
 import { useAppLocale } from '../localization/LocaleContext';
 import { calculateFreshness, FreshnessInput } from '../engine/freshnessGrader';
 import { dbService } from '../database/dbService';
-import { FishIllustration } from '../assets/illustrations/FishVectors';
+import { FishImage } from './FishImage';
 import { Ionicons } from '@expo/vector-icons';
 
 interface FreshnessModalProps {
@@ -163,14 +163,14 @@ export const FreshnessModal: React.FC<FreshnessModalProps> = ({
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
-            {/* Visual Anatomical Target Overlay */}
+            {/* Real Biological Specimen with Active Organ Focal Target */}
             <View style={[styles.illustrationCard, { backgroundColor: colors.surfaceSubtle }]}>
-              <FishIllustration
+              <FishImage
                 assetKey={fish.assetKey}
-                width={200}
-                height={115}
+                style={{ width: 220, height: 130 }}
+                resizeMode="contain"
+                borderRadius={12}
                 highlightZone={activeTab}
-                primaryColor={fish.colorHex}
               />
               <Text style={[styles.zoneBadgeText, { color: colors.textMuted }]}>
                 {isRTL ? `نقطه تمرکز: ${organTabs.find((t) => t.key === activeTab)?.label}` : `Focal Target: ${activeTab.toUpperCase()}`}

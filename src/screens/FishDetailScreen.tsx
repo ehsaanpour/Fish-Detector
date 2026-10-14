@@ -15,7 +15,7 @@ import { useAppCurrency } from '../localization/CurrencyContext';
 import { dbService } from '../database/dbService';
 import { HeaderBar } from '../components/HeaderBar';
 import { FreshnessModal } from '../components/FreshnessModal';
-import { FishIllustration } from '../assets/illustrations/FishVectors';
+import { FishImage } from '../components/FishImage';
 import { Ionicons } from '@expo/vector-icons';
 
 interface FishDetailScreenProps {
@@ -78,16 +78,23 @@ export const FishDetailScreen: React.FC<FishDetailScreenProps> = ({
       />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-        {/* Large Hero Vector Illustration Card */}
+        {/* Large Hero Card with Real Fish Photograph */}
         <View style={[styles.heroCard, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}>
-          <View style={styles.illustrationWrap}>
-            <FishIllustration
+          <View style={[styles.illustrationWrap, { width: '100%', height: 220 }]}>
+            <FishImage
               assetKey={fish.assetKey}
-              width={260}
-              height={150}
+              style={{ width: '100%', height: 220 }}
+              resizeMode="contain"
+              borderRadius={16}
               highlightZone={highlightZone}
-              primaryColor={fish.colorHex}
             />
+          </View>
+
+          <View style={[styles.photoBadgeRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <Ionicons name="camera" size={13} color={colors.accentTeal} />
+            <Text style={[styles.photoBadgeText, { color: colors.textMuted }]}>
+              {isRTL ? 'تصویر زیستی واقعی گونه' : 'Authentic Specimen Photograph'}
+            </Text>
           </View>
 
           {/* Interactive Inspection Point Toggles */}
@@ -412,9 +419,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   illustrationWrap: {
-    paddingVertical: 10,
+    paddingVertical: 6,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  photoBadgeRow: {
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 6,
+    marginBottom: 4,
+  },
+  photoBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
   },
   zonePillRow: {
     marginTop: 12,

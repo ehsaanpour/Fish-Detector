@@ -16,7 +16,7 @@ import { dbService } from '../database/dbService';
 import { FishSpecies } from '../database/schema';
 import { calculateFishCost } from '../engine/priceCalculator';
 import { HeaderBar } from '../components/HeaderBar';
-import { FishIllustration } from '../assets/illustrations/FishVectors';
+import { FishImage } from '../components/FishImage';
 import { Ionicons } from '@expo/vector-icons';
 
 interface PriceCalculatorScreenProps {
@@ -96,11 +96,11 @@ export const PriceCalculatorScreen: React.FC<PriceCalculatorScreenProps> = ({
             activeOpacity={0.8}
           >
             <View style={[styles.fishIconWrap, { backgroundColor: colors.surfaceSubtle }]}>
-              <FishIllustration
+              <FishImage
                 assetKey={selectedFish.assetKey}
-                width={70}
-                height={45}
-                primaryColor={selectedFish.colorHex}
+                style={{ width: 70, height: 45 }}
+                resizeMode="cover"
+                borderRadius={8}
               />
             </View>
 

@@ -14,7 +14,7 @@ import { useAppLocale } from '../localization/LocaleContext';
 import { HeaderBar } from '../components/HeaderBar';
 import { FramingGuide } from '../components/FramingGuide';
 import { FreshnessModal } from '../components/FreshnessModal';
-import { FishIllustration } from '../assets/illustrations/FishVectors';
+import { FishImage } from '../components/FishImage';
 import { classifyFishPhoto, InspectionPrediction } from '../engine/cv/speciesClassifier';
 import { FishSpecies } from '../database/schema';
 import { Ionicons } from '@expo/vector-icons';
@@ -99,8 +99,8 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({
               <Image source={{ uri: imageUri }} style={styles.capturedImage} resizeMode="cover" />
             ) : (
               <View style={styles.liveMockStream}>
-                {/* Visual Fish Background Silhouette */}
-                <FishIllustration assetKey="zobaidi" width={260} height={160} primaryColor="#38BDF8" />
+                {/* Real Fish Specimen Background */}
+                <FishImage assetKey="zobaidi" style={{ width: 280, height: 180, opacity: 0.65 }} resizeMode="contain" />
               </View>
             )}
 
@@ -188,11 +188,11 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({
                 ]}
               >
                 <View style={[styles.speciesVectorBox, { backgroundColor: colors.surfaceSubtle }]}>
-                  <FishIllustration
+                  <FishImage
                     assetKey={prediction.topMatch.species.assetKey}
-                    width={110}
-                    height={72}
-                    primaryColor={prediction.topMatch.species.colorHex}
+                    style={{ width: 110, height: 72 }}
+                    resizeMode="cover"
+                    borderRadius={8}
                   />
                 </View>
 

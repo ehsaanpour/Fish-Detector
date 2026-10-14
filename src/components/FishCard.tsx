@@ -4,7 +4,7 @@ import { FishSpecies } from '../database/schema';
 import { useAppTheme } from '../theme/ThemeContext';
 import { useAppLocale } from '../localization/LocaleContext';
 import { useAppCurrency } from '../localization/CurrencyContext';
-import { FishIllustration } from '../assets/illustrations/FishVectors';
+import { FishImage } from './FishImage';
 import { Ionicons } from '@expo/vector-icons';
 
 interface FishCardProps {
@@ -92,9 +92,9 @@ export const FishCard: React.FC<FishCardProps> = ({ fish, onPress, onInspectPres
           { flexDirection: isRTL ? 'row-reverse' : 'row' },
         ]}
       >
-        {/* Offline Vector Biological Illustration */}
+        {/* Real Fish Photograph */}
         <View style={[styles.illustrationBox, { backgroundColor: colors.surfaceSubtle }]}>
-          <FishIllustration assetKey={fish.assetKey} width={105} height={68} primaryColor={fish.colorHex} />
+          <FishImage assetKey={fish.assetKey} style={{ width: 105, height: 72 }} resizeMode="cover" borderRadius={12} />
         </View>
 
         {/* Text Info */}
