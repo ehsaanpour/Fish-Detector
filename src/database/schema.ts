@@ -2,7 +2,7 @@ export type FishCategory = 'persian_gulf' | 'caspian' | 'freshwater' | 'global';
 export type PriceTier = 'budget' | 'mid' | 'premium';
 
 export interface RegionalName {
-  region: 'bushehr' | 'hormozgan' | 'khuzestan' | 'south';
+  region: 'bushehr' | 'hormozgan' | 'khuzestan' | 'south' | 'chabahar' | 'gilan' | 'mazandaran' | 'north';
   regionFa: string;
   dialectName: string;
 }

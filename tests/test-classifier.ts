@@ -67,7 +67,44 @@ async function runTests() {
   console.log(`Top match: ${anonPred.topMatch.species.nameFa} (${anonPred.topMatch.species.id}) - Confidence: ${anonPred.topMatch.confidence}%`);
   console.log('Alternatives:', anonPred.alternatives.map(a => `${a.species.nameFa} (${a.confidence}%)`));
 
-  console.log('\n🎉 ALL CLASSIFIER VERIFICATION TESTS PASSED!');
+  // Test 8: Kawakawa / Zardeh fish (the user report case!)
+  console.log('\n[TEST 8] Testing Kawakawa / Zardeh Identification (زرده)...');
+  const zardehPred = await classifyFishPhoto('assets/fish/zardeh.jpg', 'ماهی_زرده_جنوب.jpg');
+  console.log(`Top match: ${zardehPred.topMatch.species.nameFa} (${zardehPred.topMatch.species.id}) - Confidence: ${zardehPred.topMatch.confidence}%`);
+  console.log(`Distinguishing features:`, zardehPred.topMatch.distinguishingFeaturesFa);
+  if (zardehPred.topMatch.species.id !== 'zardeh') {
+    throw new Error(`Expected zardeh, got ${zardehPred.topMatch.species.id}`);
+  }
+  console.log('✅ Passed: Kawakawa (ماهی زرده) successfully identified!');
+
+  // Test 9: Rashgoo fish with updated photo
+  console.log('\n[TEST 9] Testing Rashgoo Identification (راشگو)...');
+  const rashgooPred = await classifyFishPhoto('assets/fish/rashgoo.jpg', 'rashgoo_fish.jpg');
+  console.log(`Top match: ${rashgooPred.topMatch.species.nameFa} (${rashgooPred.topMatch.species.id}) - Confidence: ${rashgooPred.topMatch.confidence}%`);
+  if (rashgooPred.topMatch.species.id !== 'rashgoo') {
+    throw new Error(`Expected rashgoo, got ${rashgooPred.topMatch.species.id}`);
+  }
+  console.log('✅ Passed: Rashgoo successfully identified!');
+
+  // Test 10: Sobaity fish
+  console.log('\n[TEST 10] Testing Sobaity Seabream Identification (صبیتی)...');
+  const sobaityPred = await classifyFishPhoto('assets/fish/sobaity.jpg', 'ماهی_صبیتی_بوشهر.jpg');
+  console.log(`Top match: ${sobaityPred.topMatch.species.nameFa} (${sobaityPred.topMatch.species.id}) - Confidence: ${sobaityPred.topMatch.confidence}%`);
+  if (sobaityPred.topMatch.species.id !== 'sobaity') {
+    throw new Error(`Expected sobaity, got ${sobaityPred.topMatch.species.id}`);
+  }
+  console.log('✅ Passed: Sobaity successfully identified!');
+
+  // Test 11: Kilka fish (Caspian sprat)
+  console.log('\n[TEST 11] Testing Kilka Identification (کیلکا)...');
+  const kilkaPred = await classifyFishPhoto('assets/fish/kilka.jpg', 'کیلکا_بابلسر.jpg');
+  console.log(`Top match: ${kilkaPred.topMatch.species.nameFa} (${kilkaPred.topMatch.species.id}) - Confidence: ${kilkaPred.topMatch.confidence}%`);
+  if (kilkaPred.topMatch.species.id !== 'kilka') {
+    throw new Error(`Expected kilka, got ${kilkaPred.topMatch.species.id}`);
+  }
+  console.log('✅ Passed: Kilka successfully identified!');
+
+  console.log('\n🎉 ALL 11 CLASSIFIER VERIFICATION TESTS PASSED!');
 }
 
 runTests().catch((err) => {

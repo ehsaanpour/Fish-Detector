@@ -44,15 +44,33 @@ function normalizeToken(str: string): string {
 
 // Common aliases and synonyms for fish identification
 const SPECIES_EXTRA_ALIASES: Record<string, string[]> = {
+  zardeh: ['zardeh', 'kawakawa', 'euthynnus', 'affinis', 'mackereltuna', 'زرده', 'ماهیزرده', 'تنزرده', 'تندریا'],
+  rashgoo: ['rashgoo', 'fourfinger', 'threadfin', 'tetradactylum', 'راشگو', 'ماهیراشگو'],
+  talal: ['talal', 'kanagurta', 'indianmackerel', 'طلال', 'ماهیطلال'],
+  sobaity: ['sobaity', 'subaity', 'sparidentex', 'hasta', 'صبیتی', 'ماهیصبیتی'],
+  skipjack: ['skipjack', 'pelamis', 'katsuwonus', 'هوورمسقطی', 'مسقطی', 'گیدرخطدار'],
+  gish: ['gish', 'djedaba', 'yellowtailscad', 'گیش', 'ماهیگیش', 'جش'],
+  soltan_ebrahim: ['soltanebrahim', 'ebrahim', 'nemipterus', 'سلطانابراهیم', 'ماهیسلطانابراهیم'],
+  kafshak: ['kafshak', 'cynoglossus', 'tonguesole', 'solea', 'کفشک', 'ماهیکفشک', 'زبانگاو', 'لسانالثور'],
+  ordak_mahi: ['ordakmahi', 'lucius', 'northernpike', 'pike', 'اردکماهی', 'شوک'],
+  kilka: ['kilka', 'caspia', 'clupeonella', 'sprat', 'کیلکا', 'ماهیکیلکا'],
   ghobad: ['ghobad', 'ghobada', 'guttatus', 'kingmackerel', 'spanishmackerel', 'seerfish', 'قباد', 'ماهیقباد'],
-  shir: ['shir', 'commerson', 'kingfish', 'narrowbarred', 'ماهیشیر', 'شیرجنوب', 'شیرماهی'],
+  shir: ['shir', 'commerson', 'kingfish', 'narrowbarred', 'شیر', 'ماهیشیر', 'شیرجنوب', 'شیرماهی'],
   zobaidi: ['zobaidi', 'zubaidi', 'argenteus', 'pomfret', 'silverpomfret', 'زبیدی', 'حلواسفید'],
   halva_siah: ['halvasiah', 'blackpomfret', 'parastromateus', 'حلواسیاه'],
   sangsar: ['sangsar', 'kaakan', 'javelin', 'grunter', 'سنگسر', 'ماهیسنگسر'],
   sorkhoo: ['sorkhoo', 'redsnapper', 'snapper', 'erythropterus', 'سرخو', 'ماهیسرخو'],
   hamour: ['hamour', 'hamoor', 'grouper', 'coioides', 'هامور', 'ماهیهامور'],
+  sakan: ['sakan', 'cobia', 'canadum', 'سکن', 'ماهیسکن', 'سوکلا'],
+  hoor: ['hoor', 'tonggol', 'longtailtuna', 'tuna', 'هوور', 'ماهیهوور', 'تن', 'گیدر'],
+  shoorideh: ['shoorideh', 'croaker', 'otolithes', 'شوریده', 'ماهیشوریده'],
   ghezelala: ['ghezelala', 'trout', 'rainbowtrout', 'mykiss', 'قزل', 'قزلآلا', 'قزل_آلا'],
   kutum: ['kutum', 'caspiankutum', 'whitefish', 'ماهیسفید', 'سفیدخزر'],
+  kapoor: ['kapoor', 'carp', 'carpio', 'cyprinus', 'کپور', 'کپورمعمولی', 'ماهیکپور'],
+  souf: ['souf', 'lucioperca', 'pikeperch', 'سوف', 'سوفسفید', 'ماهیسوف'],
+  ozonboron: ['ozonboron', 'stellatus', 'sturgeon', 'اوزونبرون', 'ازونبرون'],
+  kefal_khazar: ['kefal', 'auratus', 'mullet', 'کفال', 'کفالخزر', 'ماهیکفال'],
+  azad_khazar: ['azad', 'salmotrutta', 'ماهیآزاد', 'آزادخزر'],
 };
 
 /**
@@ -77,7 +95,8 @@ function findSemanticMatch(uri: string, fileName?: string): string | null {
 
     for (const c of candidates) {
       const token = normalizeToken(c);
-      if (token.length >= 4 && target.includes(token)) {
+      // Support 3-letter tokens for concise Persian names (زرده, شیر, گیش, سوف, مید, سکن, طلال)
+      if (token.length >= 3 && target.includes(token)) {
         return fish.id;
       }
     }
