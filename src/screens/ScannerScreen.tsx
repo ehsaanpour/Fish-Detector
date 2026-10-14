@@ -66,10 +66,15 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({
       }
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        const uri = result.assets[0].uri;
+        const asset = result.assets[0];
+        const uri = asset.uri;
         setImageUri(uri);
         setIsAnalyzing(true);
-        const pred = await classifyFishPhoto(uri);
+        const pred = await classifyFishPhoto(uri, asset.fileName || undefined, {
+          fileName: asset.fileName || undefined,
+          width: asset.width,
+          height: asset.height,
+        });
         setPrediction(pred);
         setIsAnalyzing(false);
       }
