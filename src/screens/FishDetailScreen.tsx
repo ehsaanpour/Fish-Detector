@@ -501,6 +501,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   illustrationWrap: {
+    width: '100%',
+    alignSelf: 'stretch',
     paddingVertical: 6,
     alignItems: 'center',
     justifyContent: 'center',

@@ -73,25 +73,39 @@ export const FishImage: React.FC<FishImageProps> = ({
   borderRadius = 8,
   highlightZone = null,
 }) => {
-  const [hasError, setHasError] = useState(false);
+  const [errorAssetKey, setErrorAssetKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const hasError = errorAssetKey === assetKey;
   const imageSource = FISH_IMAGES[assetKey] || FISH_IMAGES['zobaidi'];
+  const flat = StyleSheet.flatten(style);
 
   return (
-    <View style={[styles.container, { borderRadius }]}>
+    <View
+      style={[
+        styles.container,
+        { borderRadius },
+        flat?.width === '100%' ? styles.fullWidth : null,
+        style,
+      ]}
+    >
       {hasError ? (
-        <View style={[styles.image, { borderRadius, backgroundColor: '#1E293B', alignItems: 'center', justifyContent: 'center' }, style]}>
+        <View
+          style={[
+            styles.image,
+            { borderRadius, backgroundColor: '#1E293B', alignItems: 'center', justifyContent: 'center' },
+          ]}
+        >
           <Text style={{ color: '#94A3B8', fontSize: 14 }}>🐟</Text>
         </View>
       ) : (
         <Image
           source={imageSource}
-          style={[styles.image, { borderRadius }, style]}
+          style={[styles.image, { borderRadius }]}
           resizeMode={resizeMode}
           onLoadStart={() => setLoading(true)}
           onLoadEnd={() => setLoading(false)}
-          onError={() => setHasError(true)}
+          onError={() => setErrorAssetKey(assetKey)}
         />
       )}
 
@@ -121,6 +135,10 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  fullWidth: {
+    width: '100%',
+    alignSelf: 'stretch',
   },
   image: {
     width: '100%',
