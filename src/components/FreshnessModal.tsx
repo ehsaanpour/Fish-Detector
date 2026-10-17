@@ -6,19 +6,24 @@ import {
   Modal,
   TouchableOpacity,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { FishSpecies, InspectionRecord } from '../database/schema';
 import { useAppTheme } from '../theme/ThemeContext';
 import { useAppLocale } from '../localization/LocaleContext';
-import { calculateFreshness, FreshnessInput } from '../engine/freshnessGrader';
+import { calculateFreshness, FreshnessInput, FreshnessResult } from '../engine/freshnessGrader';
 import { dbService } from '../database/dbService';
 import { FishImage } from './FishImage';
 import { Ionicons } from '@expo/vector-icons';
+import { GeminiVisionService } from '../engine/ai/geminiVisionService';
 
 interface FreshnessModalProps {
   visible: boolean;
   fish: FishSpecies;
   initialValues?: Partial<FreshnessInput>;
+  aiFreshnessResult?: FreshnessResult;
+  imageUri?: string | null;
+  base64?: string | null;
   onClose: () => void;
   onNavigateToCalculator?: (fish: FishSpecies) => void;
 }
@@ -27,6 +32,8 @@ export const FreshnessModal: React.FC<FreshnessModalProps> = ({
   visible,
   fish,
   initialValues,
+  aiFreshnessResult,
+  base64,
   onClose,
   onNavigateToCalculator,
 }) => {
@@ -47,14 +54,53 @@ export const FreshnessModal: React.FC<FreshnessModalProps> = ({
     initialValues?.fleshState || 'prime'
   );
 
+  const [currentAiResult, setCurrentAiResult] = useState<FreshnessResult | undefined>(aiFreshnessResult);
+  const [isReanalyzing, setIsReanalyzing] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
 
-  const result = calculateFreshness({
-    eyeState,
-    gillState,
-    skinState,
-    fleshState,
-  });
+  const result = calculateFreshness(
+    {
+      eyeState,
+      gillState,
+      skinState,
+      fleshState,
+    },
+    currentAiResult?.aiObservations,
+    currentAiResult?.isAiEvaluated ? currentAiResult.score : undefined
+  );
+
+  const handleReanalyzeWithGemini = async () => {
+    if (!base64) return;
+    setIsReanalyzing(true);
+    try {
+      const refreshed = await GeminiVisionService.inspectFreshnessWithGemini(base64, fish);
+      if (refreshed) {
+        setCurrentAiResult(refreshed);
+        // Sync states if organ breakdown exists
+        if (refreshed.scoresBreakdown) {
+          if (refreshed.scoresBreakdown.eyes >= 22) setEyeState('prime');
+          else if (refreshed.scoresBreakdown.eyes >= 14) setEyeState('good');
+          else setEyeState('poor');
+
+          if (refreshed.scoresBreakdown.gills >= 26) setGillState('prime');
+          else if (refreshed.scoresBreakdown.gills >= 16) setGillState('good');
+          else setGillState('poor');
+
+          if (refreshed.scoresBreakdown.skin >= 22) setSkinState('prime');
+          else if (refreshed.scoresBreakdown.skin >= 12) setSkinState('good');
+          else setSkinState('poor');
+
+          if (refreshed.scoresBreakdown.flesh >= 17) setFleshState('prime');
+          else if (refreshed.scoresBreakdown.flesh >= 10) setFleshState('good');
+          else setFleshState('poor');
+        }
+      }
+    } catch {
+      // Ignore AI evaluation error
+    } finally {
+      setIsReanalyzing(false);
+    }
+  };
 
   const handleSave = React.useCallback(async () => {
     const now = Date.now();
@@ -89,7 +135,10 @@ export const FreshnessModal: React.FC<FreshnessModalProps> = ({
       case 'eyes':
         return {
           current: eyeState,
-          set: setEyeState,
+          set: (val: 'prime' | 'good' | 'poor') => {
+            setEyeState(val);
+            if (currentAiResult) setCurrentAiResult({ ...currentAiResult, isAiEvaluated: false });
+          },
           options: [
             { state: 'prime' as const, label: t.criteria.eyes.prime, scoreText: '25/25 pts' },
             { state: 'good' as const, label: t.criteria.eyes.good, scoreText: '16/25 pts' },
@@ -99,7 +148,10 @@ export const FreshnessModal: React.FC<FreshnessModalProps> = ({
       case 'gills':
         return {
           current: gillState,
-          set: setGillState,
+          set: (val: 'prime' | 'good' | 'poor') => {
+            setGillState(val);
+            if (currentAiResult) setCurrentAiResult({ ...currentAiResult, isAiEvaluated: false });
+          },
           options: [
             { state: 'prime' as const, label: t.criteria.gills.prime, scoreText: '30/30 pts' },
             { state: 'good' as const, label: t.criteria.gills.good, scoreText: '18/30 pts' },
@@ -109,7 +161,10 @@ export const FreshnessModal: React.FC<FreshnessModalProps> = ({
       case 'skin':
         return {
           current: skinState,
-          set: setSkinState,
+          set: (val: 'prime' | 'good' | 'poor') => {
+            setSkinState(val);
+            if (currentAiResult) setCurrentAiResult({ ...currentAiResult, isAiEvaluated: false });
+          },
           options: [
             { state: 'prime' as const, label: t.criteria.skin.prime, scoreText: '25/25 pts' },
             { state: 'good' as const, label: t.criteria.skin.good, scoreText: '15/25 pts' },
@@ -120,7 +175,10 @@ export const FreshnessModal: React.FC<FreshnessModalProps> = ({
       default:
         return {
           current: fleshState,
-          set: setFleshState,
+          set: (val: 'prime' | 'good' | 'poor') => {
+            setFleshState(val);
+            if (currentAiResult) setCurrentAiResult({ ...currentAiResult, isAiEvaluated: false });
+          },
           options: [
             { state: 'prime' as const, label: t.criteria.flesh.prime, scoreText: '20/20 pts' },
             { state: 'good' as const, label: t.criteria.flesh.good, scoreText: '12/20 pts' },
@@ -131,6 +189,26 @@ export const FreshnessModal: React.FC<FreshnessModalProps> = ({
   };
 
   const criteria = getCurrentCriteria();
+
+  const getCurrentAiObservation = () => {
+    if (!currentAiResult?.aiObservations) return null;
+    const obs = currentAiResult.aiObservations;
+    switch (activeTab) {
+      case 'eyes':
+        return isRTL ? obs.eyesFa : obs.eyesEn;
+      case 'gills':
+        return isRTL ? obs.gillsFa : obs.gillsEn;
+      case 'skin':
+        return isRTL ? obs.skinFa : obs.skinEn;
+      case 'flesh':
+        return isRTL ? obs.fleshFa : obs.fleshEn;
+    }
+  };
+
+  const currentObservation = getCurrentAiObservation();
+  const shelfLife = isRTL
+    ? currentAiResult?.aiObservations?.daysOnIceFa
+    : currentAiResult?.aiObservations?.daysOnIceEn || currentAiResult?.aiObservations?.daysOnIceFa;
 
   return (
     <Modal visible={visible} animationType="slide" transparent>
@@ -155,12 +233,33 @@ export const FreshnessModal: React.FC<FreshnessModalProps> = ({
               </Text>
             </View>
 
-            <TouchableOpacity
-              onPress={onClose}
-              style={[styles.closeBtn, { backgroundColor: colors.surfaceSubtle }]}
-            >
-              <Ionicons name="close" size={20} color={colors.textPrimary} />
-            </TouchableOpacity>
+            <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 8 }}>
+              {base64 && (
+                <TouchableOpacity
+                  onPress={handleReanalyzeWithGemini}
+                  disabled={isReanalyzing}
+                  style={[styles.reanalyzeBtn, { borderColor: '#0EA5E9', backgroundColor: colors.surfaceSubtle }]}
+                >
+                  {isReanalyzing ? (
+                    <ActivityIndicator size="small" color="#0EA5E9" />
+                  ) : (
+                    <>
+                      <Ionicons name="sparkles" size={13} color="#0EA5E9" />
+                      <Text style={styles.reanalyzeText}>
+                        {isRTL ? 'تحلیل جمنای' : 'Gemini AI'}
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              )}
+
+              <TouchableOpacity
+                onPress={onClose}
+                style={[styles.closeBtn, { backgroundColor: colors.surfaceSubtle }]}
+              >
+                <Ionicons name="close" size={20} color={colors.textPrimary} />
+              </TouchableOpacity>
+            </View>
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
@@ -188,6 +287,16 @@ export const FreshnessModal: React.FC<FreshnessModalProps> = ({
                 },
               ]}
             >
+              {/* Gemini AI Header Badge if Evaluated by AI */}
+              {currentAiResult?.isAiEvaluated && (
+                <View style={[styles.aiVerifiedBanner, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                  <Ionicons name="sparkles" size={13} color="#0284C7" />
+                  <Text style={styles.aiVerifiedText}>
+                    {isRTL ? 'ارزیابی خودکار با هوش مصنوعی چندوجهی گوگل جمنای' : 'Evaluated with Google Gemini Multimodal AI'}
+                  </Text>
+                </View>
+              )}
+
               <View
                 style={[
                   styles.certHeader,
@@ -211,6 +320,16 @@ export const FreshnessModal: React.FC<FreshnessModalProps> = ({
               <Text style={[styles.certSummary, { color: colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>
                 {isRTL ? result.summaryFa : result.summaryEn}
               </Text>
+
+              {/* Shelf Life from Gemini */}
+              {shelfLife && (
+                <View style={[styles.shelfLifeTag, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                  <Ionicons name="snow" size={13} color="#0284C7" />
+                  <Text style={styles.shelfLifeTagText}>
+                    {isRTL ? `ماندگاری در یخ: ${shelfLife}` : `Shelf-life on ice: ${shelfLife}`}
+                  </Text>
+                </View>
+              )}
 
               <View
                 style={[
@@ -268,8 +387,26 @@ export const FreshnessModal: React.FC<FreshnessModalProps> = ({
               })}
             </View>
 
+            {/* AI Specific Observation for active tab */}
+            {currentObservation && (
+              <View style={[styles.aiObsCard, { backgroundColor: colors.surface, borderColor: '#0EA5E9' }]}>
+                <View style={[styles.aiObsHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                  <Ionicons name="sparkles" size={14} color="#0EA5E9" />
+                  <Text style={styles.aiObsTitle}>
+                    {isRTL ? 'مشاهده بینایی هوش مصنوعی جمنای:' : 'Gemini AI Visual Observation:'}
+                  </Text>
+                </View>
+                <Text style={[styles.aiObsBody, { color: colors.textPrimary, textAlign: isRTL ? 'right' : 'left' }]}>
+                  {currentObservation}
+                </Text>
+              </View>
+            )}
+
             {/* Criteria Radios */}
             <View style={styles.criteriaContainer}>
+              <Text style={[styles.criteriaHeading, { color: colors.textMuted, textAlign: isRTL ? 'right' : 'left' }]}>
+                {isRTL ? 'تنظیم دستی وضعیت این اندام:' : 'Fine-tune organ state:'}
+              </Text>
               {criteria.options.map((option) => {
                 const isSelected = criteria.current === option.state;
                 return (
@@ -384,6 +521,20 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: 2,
   },
+  reanalyzeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  reanalyzeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#0EA5E9',
+  },
   closeBtn: {
     width: 32,
     height: 32,
@@ -408,6 +559,34 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 2,
     padding: 14,
+  },
+  aiVerifiedBanner: {
+    alignItems: 'center',
+    gap: 6,
+    paddingBottom: 8,
+    marginBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(2, 132, 199, 0.15)',
+  },
+  aiVerifiedText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#0284C7',
+  },
+  shelfLifeTag: {
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    backgroundColor: 'rgba(2, 132, 199, 0.08)',
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+  },
+  shelfLifeTagText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#0284C7',
   },
   certHeader: {
     alignItems: 'center',
@@ -450,13 +629,13 @@ const styles = StyleSheet.create({
   verdictText: {
     flex: 1,
     fontSize: 11,
-    fontWeight: '600',
     lineHeight: 16,
+    fontWeight: '600',
   },
   tabsRow: {
-    marginTop: 16,
-    gap: 6,
-    justifyContent: 'space-between',
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 14,
   },
   organTab: {
     flex: 1,
@@ -465,7 +644,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 4,
     paddingVertical: 8,
-    paddingHorizontal: 4,
     borderRadius: 10,
     borderWidth: 1,
   },
@@ -473,58 +651,83 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
   },
+  aiObsCard: {
+    marginTop: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 10,
+  },
+  aiObsHeader: {
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  aiObsTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#0EA5E9',
+  },
+  aiObsBody: {
+    fontSize: 12,
+    lineHeight: 18,
+  },
   criteriaContainer: {
     marginTop: 12,
-    gap: 8,
+  },
+  criteriaHeading: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginBottom: 6,
   },
   criteriaCard: {
+    flexDirection: 'row',
     alignItems: 'center',
     padding: 12,
     borderRadius: 12,
-    borderWidth: 1.5,
+    borderWidth: 1,
+    marginBottom: 8,
   },
   radioCircle: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
   radioDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   criteriaLabel: {
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 13,
   },
   scoreBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
   },
   scoreBadgeText: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '700',
   },
   actionsBox: {
-    marginTop: 18,
-    gap: 10,
+    marginTop: 12,
+    gap: 8,
   },
   saveBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingVertical: 14,
-    borderRadius: 14,
+    paddingVertical: 12,
+    borderRadius: 12,
   },
   saveBtnText: {
     color: '#FFFFFF',
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '700',
   },
   calcBtn: {
     flexDirection: 'row',
@@ -532,11 +735,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     paddingVertical: 12,
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1.5,
   },
   calcBtnText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
   },
 });

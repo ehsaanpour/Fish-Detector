@@ -23,6 +23,7 @@ import {
   InspectionPrediction,
   ImageAnalysisMeta,
 } from '../engine/cv/speciesClassifier';
+import { calculateFreshness } from '../engine/freshnessGrader';
 import { GeminiVisionService } from '../engine/ai/geminiVisionService';
 import { FishSpecies } from '../database/schema';
 import { ALL_FISH_SPECIES } from '../database/seedData';
@@ -88,10 +89,13 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({
       });
       setPrediction(pred);
       setIsManuallyOverridden(false);
-      setIsUsedGemini(isGeminiActive && !!meta?.base64);
+      setIsUsedGemini(pred.detectedWithAI);
+      if (pred.requiresApiKey) {
+        setShowGeminiModal(true);
+      }
     } catch {
-      // Fallback in case of unexpected failure
-      const fallbackPred = await classifyFishPhoto('local_simulated_scan');
+      // In case of error, retry with safe default
+      const fallbackPred = await classifyFishPhoto(uri);
       setPrediction(fallbackPred);
     } finally {
       setIsAnalyzing(false);
@@ -222,6 +226,13 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({
   const handleManualSelectFish = useCallback(
     (selected: FishSpecies) => {
       const now = Date.now();
+      const defaultFreshness = {
+        eyeState: 'prime' as const,
+        gillState: 'prime' as const,
+        skinState: 'prime' as const,
+        fleshState: 'prime' as const,
+      };
+
       if (!prediction) {
         const pred: InspectionPrediction = {
           topMatch: {
@@ -231,13 +242,10 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({
             distinguishingFeaturesFa: selected.physicalFeaturesFa,
           },
           alternatives: [],
-          automatedFreshnessEstimate: {
-            eyeState: 'prime',
-            gillState: 'prime',
-            skinState: 'prime',
-            fleshState: 'prime',
-          },
+          automatedFreshnessEstimate: defaultFreshness,
+          aiFreshnessResult: calculateFreshness(defaultFreshness),
           scanTimestamp: now,
+          detectedWithAI: false,
         };
         setPrediction(pred);
       } else {
@@ -255,6 +263,7 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({
             distinguishingFeaturesFa: selected.physicalFeaturesFa,
           },
           alternatives: updatedAlternatives,
+          scanTimestamp: now,
         });
       }
       setIsManuallyOverridden(true);
@@ -604,6 +613,117 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({
                 ))}
               </View>
 
+              {/* Gemini AI Freshness Assessment Card */}
+              {prediction.aiFreshnessResult && (
+                <View
+                  style={[
+                    styles.aiFreshnessCard,
+                    {
+                      backgroundColor: colors.surfaceSubtle,
+                      borderColor: prediction.aiFreshnessResult.badgeColor,
+                    },
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.aiFreshnessHeader,
+                      { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.aiFreshnessGradeBadge,
+                        { backgroundColor: prediction.aiFreshnessResult.badgeColor },
+                      ]}
+                    >
+                      <Text style={styles.aiFreshnessGradeLetter}>
+                        {prediction.aiFreshnessResult.grade}
+                      </Text>
+                    </View>
+
+                    <View style={{ flex: 1, paddingHorizontal: 10, alignItems: isRTL ? 'flex-end' : 'flex-start' }}>
+                      <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
+                        <Ionicons name="sparkles" size={13} color="#0284C7" />
+                        <Text style={[styles.aiFreshnessTitle, { color: colors.textPrimary }]}>
+                          {isRTL ? 'ارزیابی تازگی هوش مصنوعی جمنای' : 'Gemini AI Freshness Assessment'}
+                        </Text>
+                      </View>
+                      <Text style={[styles.aiFreshnessSub, { color: prediction.aiFreshnessResult.badgeColor }]}>
+                        {isRTL ? prediction.aiFreshnessResult.gradeTitleFa : prediction.aiFreshnessResult.gradeTitleEn} ({formatNumber(prediction.aiFreshnessResult.score)}%)
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* 4 Organ Status Pills */}
+                  <View style={[styles.organPillsRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                    <View style={[styles.organPill, { backgroundColor: colors.surface }]}>
+                      <Ionicons name="eye" size={12} color={colors.primary} />
+                      <Text style={[styles.organPillText, { color: colors.textSecondary }]}>
+                        {isRTL ? 'چشم' : 'Eye'}: {prediction.automatedFreshnessEstimate.eyeState === 'prime' ? (isRTL ? 'عالی' : 'Prime') : prediction.automatedFreshnessEstimate.eyeState === 'good' ? (isRTL ? 'خوب' : 'Good') : (isRTL ? 'ضعیف' : 'Poor')}
+                      </Text>
+                    </View>
+                    <View style={[styles.organPill, { backgroundColor: colors.surface }]}>
+                      <Ionicons name="water" size={12} color={colors.primary} />
+                      <Text style={[styles.organPillText, { color: colors.textSecondary }]}>
+                        {isRTL ? 'آبشش' : 'Gills'}: {prediction.automatedFreshnessEstimate.gillState === 'prime' ? (isRTL ? 'عالی' : 'Prime') : prediction.automatedFreshnessEstimate.gillState === 'good' ? (isRTL ? 'خوب' : 'Good') : (isRTL ? 'ضعیف' : 'Poor')}
+                      </Text>
+                    </View>
+                    <View style={[styles.organPill, { backgroundColor: colors.surface }]}>
+                      <Ionicons name="sparkles" size={12} color={colors.primary} />
+                      <Text style={[styles.organPillText, { color: colors.textSecondary }]}>
+                        {isRTL ? 'پوست' : 'Skin'}: {prediction.automatedFreshnessEstimate.skinState === 'prime' ? (isRTL ? 'عالی' : 'Prime') : prediction.automatedFreshnessEstimate.skinState === 'good' ? (isRTL ? 'خوب' : 'Good') : (isRTL ? 'ضعیف' : 'Poor')}
+                      </Text>
+                    </View>
+                    <View style={[styles.organPill, { backgroundColor: colors.surface }]}>
+                      <Ionicons name="finger-print" size={12} color={colors.primary} />
+                      <Text style={[styles.organPillText, { color: colors.textSecondary }]}>
+                        {isRTL ? 'بافت' : 'Flesh'}: {prediction.automatedFreshnessEstimate.fleshState === 'prime' ? (isRTL ? 'عالی' : 'Prime') : prediction.automatedFreshnessEstimate.fleshState === 'good' ? (isRTL ? 'خوب' : 'Good') : (isRTL ? 'ضعیف' : 'Poor')}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Summary & Shelf Life */}
+                  <Text style={[styles.aiFreshnessSummaryText, { color: colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>
+                    {isRTL ? prediction.aiFreshnessResult.summaryFa : prediction.aiFreshnessResult.summaryEn}
+                  </Text>
+
+                  {prediction.aiFreshnessResult.aiObservations?.daysOnIceFa && (
+                    <View style={[styles.shelfLifeRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                      <Ionicons name="snow" size={13} color="#0284C7" />
+                      <Text style={styles.shelfLifeText}>
+                        {isRTL
+                          ? `ماندگاری در یخ: ${prediction.aiFreshnessResult.aiObservations.daysOnIceFa}`
+                          : `Shelf life on ice: ${prediction.aiFreshnessResult.aiObservations.daysOnIceEn || prediction.aiFreshnessResult.aiObservations.daysOnIceFa}`}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              )}
+
+              {/* API Key Missing Notice */}
+              {prediction.requiresApiKey && (
+                <View style={[styles.apiKeyMissingBox, { backgroundColor: colors.surfaceSubtle, borderColor: colors.primary }]}>
+                  <Ionicons name="key-outline" size={24} color={colors.primary} />
+                  <Text style={[styles.apiKeyMissingTitle, { color: colors.textPrimary }]}>
+                    {isRTL ? 'فعال‌سازی هوش مصنوعی جمنای' : 'Activate Gemini Vision AI'}
+                  </Text>
+                  <Text style={[styles.apiKeyMissingDesc, { color: colors.textSecondary, textAlign: 'center' }]}>
+                    {isRTL
+                      ? 'برای تشخیص دقیق ماهی و بررسی ۴ مرحله‌ای تازگی با هوش مصنوعی، کلید رایگان جمنای را وارد کنید.'
+                      : 'To enable accurate fish and 4-point freshness detection with AI, please enter your free Gemini key.'}
+                  </Text>
+                  <TouchableOpacity
+                    style={[styles.apiKeyMissingBtn, { backgroundColor: colors.primary }]}
+                    onPress={() => setShowGeminiModal(true)}
+                  >
+                    <Ionicons name="sparkles" size={14} color="#FFFFFF" />
+                    <Text style={styles.apiKeyMissingBtnText}>
+                      {isRTL ? 'تنظیم کلید رایگان هوش مصنوعی' : 'Configure Gemini API Key'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
               {/* Action Buttons: 4-Point Freshness Grader & Detail */}
               <View style={styles.actionRow}>
                 <TouchableOpacity
@@ -658,11 +778,15 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({
       </ScrollView>
 
       {/* Interactive Freshness Evaluator Modal */}
-      {prediction && (
+      {prediction && showFreshnessModal && (
         <FreshnessModal
+          key={`${prediction.topMatch.species.id}_${prediction.scanTimestamp}`}
           visible={showFreshnessModal}
           fish={prediction.topMatch.species}
           initialValues={prediction.automatedFreshnessEstimate}
+          aiFreshnessResult={prediction.aiFreshnessResult}
+          imageUri={imageUri}
+          base64={imageMeta?.base64}
           onClose={() => setShowFreshnessModal(false)}
           onNavigateToCalculator={onNavigateToCalculator}
         />
@@ -1151,6 +1275,104 @@ const styles = StyleSheet.create({
   altChipText: {
     fontSize: 11,
     fontWeight: '600',
+  },
+  // Gemini AI Freshness Card
+  aiFreshnessCard: {
+    borderRadius: 14,
+    borderWidth: 1.5,
+    padding: 12,
+    marginTop: 10,
+    marginBottom: 6,
+  },
+  aiFreshnessHeader: {
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  aiFreshnessGradeBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  aiFreshnessGradeLetter: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  aiFreshnessTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  aiFreshnessSub: {
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  organPillsRow: {
+    flexDirection: 'row',
+    gap: 6,
+    flexWrap: 'wrap',
+    marginBottom: 8,
+  },
+  organPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  organPillText: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  aiFreshnessSummaryText: {
+    fontSize: 11,
+    lineHeight: 16,
+    marginBottom: 6,
+  },
+  shelfLifeRow: {
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 2,
+  },
+  shelfLifeText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  apiKeyMissingBox: {
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    padding: 16,
+    alignItems: 'center',
+    marginTop: 10,
+    marginBottom: 6,
+  },
+  apiKeyMissingTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    marginTop: 6,
+  },
+  apiKeyMissingDesc: {
+    fontSize: 11,
+    lineHeight: 16,
+    marginVertical: 6,
+  },
+  apiKeyMissingBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+    marginTop: 4,
+  },
+  apiKeyMissingBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
   },
   // Modal Styles
   modalBackdrop: {

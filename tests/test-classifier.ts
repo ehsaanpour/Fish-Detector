@@ -58,14 +58,18 @@ async function runTests() {
   }
   console.log('✅ Passed: Ghobad successfully identified!');
 
-  // Test 7: Ghobad fish (anonymous image with dimensions)
-  console.log('\n[TEST 7] Testing Ghobad Identification (anonymous upload)...');
-  const anonPred = await classifyFishPhoto('blob:http://localhost:8081/upload_random', 'camera_capture_1294.jpg', {
-    width: 800,
-    height: 320, // 2.5 aspect ratio, typical of Ghobad/mackerel
-  });
-  console.log(`Top match: ${anonPred.topMatch.species.nameFa} (${anonPred.topMatch.species.id}) - Confidence: ${anonPred.topMatch.confidence}%`);
-  console.log('Alternatives:', anonPred.alternatives.map(a => `${a.species.nameFa} (${a.confidence}%)`));
+  // Test 7: Ghobad fish with filename hint and AI Freshness integration
+  console.log('\n[TEST 7] Testing Ghobad Identification & AI Freshness Grading...');
+  const ghobadAiPred = await classifyFishPhoto('blob:http://localhost:8081/upload_ghobad', 'ghobad_catch.jpg');
+  console.log(`Top match: ${ghobadAiPred.topMatch.species.nameFa} (${ghobadAiPred.topMatch.species.id}) - Confidence: ${ghobadAiPred.topMatch.confidence}%`);
+  console.log('AI Freshness Grade:', ghobadAiPred.aiFreshnessResult?.grade, `(${ghobadAiPred.aiFreshnessResult?.score}%)`);
+  if (ghobadAiPred.topMatch.species.id !== 'ghobad') {
+    throw new Error(`Expected ghobad, got ${ghobadAiPred.topMatch.species.id}`);
+  }
+  if (!ghobadAiPred.aiFreshnessResult) {
+    throw new Error('Expected aiFreshnessResult to be populated');
+  }
+  console.log('✅ Passed: Species and AI Freshness successfully generated!');
 
   // Test 8: Kawakawa / Zardeh fish (the user report case!)
   console.log('\n[TEST 8] Testing Kawakawa / Zardeh Identification (زرده)...');
@@ -132,22 +136,21 @@ async function runTests() {
   }
   console.log('✅ Passed: Persian dialect کوتر recognized!');
 
-  // Test 15: Anonymous Barracuda upload with slender morphology (aspectRatio: 4.2)
-  console.log('\n[TEST 15] Testing Anonymous Barracuda silhouette upload (slender needle body AR 4.2)...');
+  // Test 15: Anonymous photo upload without API key requires Gemini AI configuration (no wrong Cod guesses)
+  console.log('\n[TEST 15] Testing Anonymous photo upload (requires Gemini AI Key, eliminates wrong Cod guess)...');
   const anonCuda = await classifyFishPhoto('blob:http://localhost:8081/camera_0192.jpg', 'IMG_0192.jpg', {
     width: 840,
-    height: 200, // AR 4.2 - typical of Barracuda/Dolmi
+    height: 200,
   });
-  console.log(`Top match: ${anonCuda.topMatch.species.nameFa} (${anonCuda.topMatch.species.id}) - Confidence: ${anonCuda.topMatch.confidence}%`);
-  console.log('Alternatives:', anonCuda.alternatives.map(a => `${a.species.nameFa} (${a.confidence}%)`));
-  if (!['dolmi', 'kharoo', 'shir'].includes(anonCuda.topMatch.species.id)) {
-    throw new Error(`Expected needle-body fish (dolmi, kharoo, or shir), got ${anonCuda.topMatch.species.id}`);
+  console.log(`Requires API key: ${anonCuda.requiresApiKey}, Detected with AI: ${anonCuda.detectedWithAI}`);
+  if (!anonCuda.requiresApiKey) {
+    throw new Error('Expected requiresApiKey to be true when Gemini is unconfigured');
   }
-  // Ensure it's NEVER classified as Cod!
-  if (anonCuda.topMatch.species.id === 'cod') {
-    throw new Error(`CRITICAL: Slender needle fish was mistakenly classified as Cod!`);
+  // Ensure it's NEVER misclassified as Cod!
+  if (anonCuda.topMatch.species.id === 'cod' && anonCuda.topMatch.confidence > 0) {
+    throw new Error(`CRITICAL: Local detector mistakenly guessed Cod!`);
   }
-  console.log('✅ Passed: Anonymous needle-silhouette fish correctly mapped to pelagic predator (NOT Cod)!');
+  console.log('✅ Passed: Anonymous photo cleanly requests Gemini AI key without flawed local dHash guessing!');
 
   // Test 16: Orientation & Flip Invariance (head on right vs left)
   console.log('\n[TEST 16] Testing Horizontal Flip & 90deg Rotation parameter passing...');

@@ -2,21 +2,39 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ALL_FISH_SPECIES } from '../../database/seedData';
 import { FishSpecies } from '../../database/schema';
 import { InspectionPrediction } from '../cv/speciesClassifier';
-import { FreshnessInput } from '../freshnessGrader';
+import { calculateFreshness, FreshnessInput, FreshnessResult } from '../freshnessGrader';
 
 const GEMINI_STORAGE_KEY = '@fish_inspector_gemini_api_key';
+
+export interface GeminiFreshnessAssessment {
+  score: number;
+  grade: 'A' | 'B' | 'C' | 'D';
+  eyeState: 'prime' | 'good' | 'poor';
+  gillState: 'prime' | 'good' | 'poor';
+  skinState: 'prime' | 'good' | 'poor';
+  fleshState: 'prime' | 'good' | 'poor';
+  eyeObservationsFa: string;
+  eyeObservationsEn: string;
+  gillObservationsFa: string;
+  gillObservationsEn: string;
+  skinObservationsFa: string;
+  skinObservationsEn: string;
+  fleshObservationsFa: string;
+  fleshObservationsEn: string;
+  summaryFa: string;
+  summaryEn: string;
+  culinaryVerdictFa: string;
+  culinaryVerdictEn: string;
+  daysOnIceRemainingFa: string;
+  daysOnIceRemainingEn: string;
+}
 
 export interface GeminiClassificationResult {
   speciesId: string;
   confidence: number;
   distinguishingFeaturesFa: string[];
   distinguishingFeaturesEn: string[];
-  freshness: {
-    eyeState: 'prime' | 'good' | 'poor';
-    gillState: 'prime' | 'good' | 'poor';
-    skinState: 'prime' | 'good' | 'poor';
-    fleshState: 'prime' | 'good' | 'poor';
-  };
+  freshness: GeminiFreshnessAssessment;
   alternatives?: {
     speciesId: string;
     confidence: number;
@@ -67,8 +85,7 @@ export class GeminiVisionService {
   }
 
   /**
-   * Identifies the fish species using Google Gemini Vision API.
-   * Sends the base64-encoded image and matches against the 46 catalog species.
+   * Identifies the fish species AND evaluates 4-point biological freshness using Google Gemini Vision AI.
    */
   static async classifyFishWithGemini(
     base64Data: string,
@@ -86,23 +103,58 @@ export class GeminiVisionService {
       dialects: f.regionalNames?.map((r) => r.dialectName).join(', ') || '',
     }));
 
-    const systemPrompt = `You are a world-class marine ichthyologist and expert Persian Gulf / Caspian Sea fisheries inspector.
-Examine this fish image closely and identify the exact commercial fish species.
+    const systemPrompt = `You are an elite marine ichthyologist and senior commercial fisheries quality inspector specializing in Persian Gulf, Caspian Sea, and commercial aquaculture species.
 
-IMPORTANT: Match the fish to ONE of the following 46 known catalog species:
+Carefully examine this fish image and perform TWO tasks with extreme precision:
+1. SPECIES IDENTIFICATION: Match the fish strictly to ONE of the 46 known catalog species listed below.
+2. 4-POINT BIOLOGICAL FRESHNESS EVALUATION (FAO / Quality Index Method):
+   Analyze:
+   - Eyes: Pupil clarity (deep clear black vs cloudy/milky) & cornea (bulging convex vs flat/sunken).
+   - Gills: Bright crimson/red vs pale pink/brown/foul mucus.
+   - Skin & Scales: Metallic iridescent sheen, firmly adhering scales vs dull, dry, sloughing scales.
+   - Flesh & Belly: Firm elastic muscular resilience, intact belly vs soft, depressed or burst belly.
+
+CATALOG OF 46 KNOWN SPECIES:
 ${JSON.stringify(catalogSummary, null, 1)}
 
-You must return ONLY a valid JSON object with the following schema:
+KEY IDENTIFICATION RULES:
+- Great Barracuda / Sphyraena (ماهی دولمی / کوتر): Slender needle/torpedo body, pointed snout, dagger fangs -> speciesId "dolmi".
+- Silver Pomfret / Pampus argenteus (حلوا سفید / زبیدی): Silvery diamond flattened disc -> speciesId "zobaidi".
+- Black Pomfret (حلوا سیاه): Dark oval disc -> speciesId "halva_siah".
+- Spanish Mackerel (ماهی شیر): Elongated silvery body with vertical dark wavy lines -> speciesId "shir".
+- King Mackerel (ماهی قباد): Mackerel body with scattered round spots -> speciesId "ghobad".
+- Orange-spotted Grouper (هامور): Robust body, rounded head with brown/orange spots -> speciesId "hamour".
+- Javelin Grunter (سنگسر): Compressed silvery body with golden/olive back and stiff operculum -> speciesId "sangsar".
+- Mahi-mahi (ماهی عنزه / دلفین‌ماهی): Bright neon green/yellow, steep blunt forehead -> speciesId "mahimahi".
+- Kawakawa / Mackerel Tuna (ماهی زرده / تن زرده): Tuna body with broken dark oblique lines above lateral line and dark spots between pectoral and pelvic fins -> speciesId "zardeh".
+
+RETURN ONLY VALID RAW JSON WITH THIS EXACT STRUCTURE:
 {
   "speciesId": "<exact id matching one of the 46 species above>",
   "confidence": <integer percentage 80-99>,
-  "distinguishingFeaturesFa": ["نکته بارز فیزیکی ۱", "نکته بارز ۲", "نکته بارز ۳"],
-  "distinguishingFeaturesEn": ["Physical feature 1", "Physical feature 2", "Physical feature 3"],
+  "distinguishingFeaturesFa": ["ویژگی متمایز ظاهری ۱", "ویژگی متمایز ۲", "ویژگی متمایز ۳"],
+  "distinguishingFeaturesEn": ["Distinguishing feature 1", "Distinguishing feature 2", "Distinguishing feature 3"],
   "freshness": {
+    "score": <integer percentage 0-100>,
+    "grade": "A" | "B" | "C" | "D",
     "eyeState": "prime" | "good" | "poor",
     "gillState": "prime" | "good" | "poor",
     "skinState": "prime" | "good" | "poor",
-    "fleshState": "prime" | "good" | "poor"
+    "fleshState": "prime" | "good" | "poor",
+    "eyeObservationsFa": "توضیح ارزیابی چشم به فارسی",
+    "eyeObservationsEn": "Eye observation in English",
+    "gillObservationsFa": "توضیح ارزیابی آبشش به فارسی",
+    "gillObservationsEn": "Gill observation in English",
+    "skinObservationsFa": "توضیح ارزیابی پوست و پولک به فارسی",
+    "skinObservationsEn": "Skin and scales observation in English",
+    "fleshObservationsFa": "توضیح قوام بافت و شکم به فارسی",
+    "fleshObservationsEn": "Flesh and belly observation in English",
+    "summaryFa": "خلاصه وضعیت تازگی و زمان تقریبی صید به فارسی",
+    "summaryEn": "Freshness summary and catch recency in English",
+    "culinaryVerdictFa": "توصیه طبخ و سلامت مصرف به فارسی",
+    "culinaryVerdictEn": "Culinary recommendation and safety in English",
+    "daysOnIceRemainingFa": "مدت زمان ماندگاری تخمینی در یخ به فارسی",
+    "daysOnIceRemainingEn": "Estimated remaining shelf-life on ice in English"
   },
   "alternatives": [
     { "speciesId": "<alternative id 1>", "confidence": <integer> },
@@ -110,14 +162,8 @@ You must return ONLY a valid JSON object with the following schema:
   ]
 }
 
-If the image clearly depicts a Great Barracuda / Sphyraena (ماهی دولمی / کوتر), the speciesId is "dolmi".
-If it is a Silver Pomfret / Pampus argenteus (حلوا سفید / زبیدی), the speciesId is "zobaidi".
-If it is a Spanish Mackerel / Scomberomorus commerson (ماهی شیر), the speciesId is "shir".
-If it is King Mackerel / Scomberomorus guttatus (ماهی قباد), the speciesId is "ghobad".
-If it is Orange-spotted Grouper (هامور), the speciesId is "hamour".
-Do not output Markdown backticks or any preamble, output raw JSON only.`;
+DO NOT output Markdown backticks or extra commentary. Return raw JSON only.`;
 
-    // Try modern Gemini models: gemini-2.5-flash first, fallback to gemini-1.5-flash
     const models = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash'];
 
     for (const model of models) {
@@ -162,7 +208,6 @@ Do not output Markdown backticks or any preamble, output raw JSON only.`;
 
         if (!textContent) continue;
 
-        // Clean any code block fencing if present
         const cleanedJson = textContent.replace(/^```json\s*/i, '').replace(/```\s*$/i, '');
         const parsed: GeminiClassificationResult = JSON.parse(cleanedJson);
 
@@ -215,12 +260,35 @@ Do not output Markdown backticks or any preamble, output raw JSON only.`;
           }
         }
 
-        const freshnessEstimate: FreshnessInput = {
+        const freshnessInput: FreshnessInput = {
           eyeState: parsed.freshness?.eyeState || 'prime',
           gillState: parsed.freshness?.gillState || 'prime',
           skinState: parsed.freshness?.skinState || 'prime',
           fleshState: parsed.freshness?.fleshState || 'prime',
         };
+
+        const aiObs = {
+          eyesFa: parsed.freshness?.eyeObservationsFa,
+          eyesEn: parsed.freshness?.eyeObservationsEn,
+          gillsFa: parsed.freshness?.gillObservationsFa,
+          gillsEn: parsed.freshness?.gillObservationsEn,
+          skinFa: parsed.freshness?.skinObservationsFa,
+          skinEn: parsed.freshness?.skinObservationsEn,
+          fleshFa: parsed.freshness?.fleshObservationsFa,
+          fleshEn: parsed.freshness?.fleshObservationsEn,
+          daysOnIceFa: parsed.freshness?.daysOnIceRemainingFa,
+          daysOnIceEn: parsed.freshness?.daysOnIceRemainingEn,
+          aiSummaryFa: parsed.freshness?.summaryFa,
+          aiSummaryEn: parsed.freshness?.summaryEn,
+          aiCulinaryVerdictFa: parsed.freshness?.culinaryVerdictFa,
+          aiCulinaryVerdictEn: parsed.freshness?.culinaryVerdictEn,
+        };
+
+        const aiFreshnessResult = calculateFreshness(
+          freshnessInput,
+          aiObs,
+          parsed.freshness?.score
+        );
 
         return {
           topMatch: {
@@ -236,11 +304,123 @@ Do not output Markdown backticks or any preamble, output raw JSON only.`;
                 : matchedSpecies.physicalFeaturesFa,
           },
           alternatives,
-          automatedFreshnessEstimate: freshnessEstimate,
+          automatedFreshnessEstimate: freshnessInput,
+          aiFreshnessResult,
           scanTimestamp: Date.now(),
+          detectedWithAI: true,
         };
       } catch {
         // Continue to next model on error
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Dedicated Freshness Inspection with Gemini AI for any fish species or organ close-up.
+   */
+  static async inspectFreshnessWithGemini(
+    base64Data: string,
+    fish: FishSpecies,
+    mimeType: string = 'image/jpeg'
+  ): Promise<FreshnessResult | null> {
+    const apiKey = await this.getApiKey();
+    if (!apiKey) return null;
+
+    const prompt = `You are a certified marine food safety and fish freshness inspector.
+Inspect this fish image for commercial market freshness:
+Target Species: ${fish.nameEn} (${fish.nameFa} - ${fish.scientificName}).
+
+Perform a rigorous 4-point organ analysis:
+1. Eyes: pupil clarity & corneal convexity
+2. Gills: color & mucus
+3. Skin & Scales: luster, slime transparency, scale adherence
+4. Flesh & Belly: firmness, integrity
+
+RETURN ONLY RAW JSON:
+{
+  "score": <0-100>,
+  "grade": "A" | "B" | "C" | "D",
+  "eyeState": "prime" | "good" | "poor",
+  "gillState": "prime" | "good" | "poor",
+  "skinState": "prime" | "good" | "poor",
+  "fleshState": "prime" | "good" | "poor",
+  "eyeObservationsFa": "ارزیابی چشم به فارسی",
+  "eyeObservationsEn": "Eye observation in English",
+  "gillObservationsFa": "ارزیابی آبشش به فارسی",
+  "gillObservationsEn": "Gill observation in English",
+  "skinObservationsFa": "ارزیابی پوست و پولک به فارسی",
+  "skinObservationsEn": "Skin observation in English",
+  "fleshObservationsFa": "ارزیابی قوام گوشت به فارسی",
+  "fleshObservationsEn": "Flesh observation in English",
+  "summaryFa": "خلاصه تازگی به فارسی",
+  "summaryEn": "Freshness summary in English",
+  "culinaryVerdictFa": "توصیه مصرف و طبخ به فارسی",
+  "culinaryVerdictEn": "Culinary advice in English",
+  "daysOnIceRemainingFa": "ماندگاری تخمینی در یخ به فارسی",
+  "daysOnIceRemainingEn": "Shelf life on ice in English"
+}`;
+
+    const models = ['gemini-2.5-flash', 'gemini-1.5-flash'];
+
+    for (const model of models) {
+      try {
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  { text: prompt },
+                  { inline_data: { mime_type: mimeType, data: base64Data } },
+                ],
+              },
+            ],
+            generationConfig: {
+              temperature: 0.1,
+              response_mime_type: 'application/json',
+            },
+          }),
+        });
+
+        if (!response.ok) continue;
+        const data = await response.json();
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+        if (!text) continue;
+
+        const cleaned = text.replace(/^```json\s*/i, '').replace(/```\s*$/i, '');
+        const parsed: GeminiFreshnessAssessment = JSON.parse(cleaned);
+
+        const input: FreshnessInput = {
+          eyeState: parsed.eyeState || 'prime',
+          gillState: parsed.gillState || 'prime',
+          skinState: parsed.skinState || 'prime',
+          fleshState: parsed.fleshState || 'prime',
+        };
+
+        const aiObs = {
+          eyesFa: parsed.eyeObservationsFa,
+          eyesEn: parsed.eyeObservationsEn,
+          gillsFa: parsed.gillObservationsFa,
+          gillsEn: parsed.gillObservationsEn,
+          skinFa: parsed.skinObservationsFa,
+          skinEn: parsed.skinObservationsEn,
+          fleshFa: parsed.fleshObservationsFa,
+          fleshEn: parsed.fleshObservationsEn,
+          daysOnIceFa: parsed.daysOnIceRemainingFa,
+          daysOnIceEn: parsed.daysOnIceRemainingEn,
+          aiSummaryFa: parsed.summaryFa,
+          aiSummaryEn: parsed.summaryEn,
+          aiCulinaryVerdictFa: parsed.culinaryVerdictFa,
+          aiCulinaryVerdictEn: parsed.culinaryVerdictEn,
+        };
+
+        return calculateFreshness(input, aiObs, parsed.score);
+      } catch {
+        // Try next model
       }
     }
 
