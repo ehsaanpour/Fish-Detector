@@ -1,0 +1,159 @@
+name: Build & Release Android APKs
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release Tag (e.g. v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+      release_title:
+        description: 'Release Title'
+        required: true
+        default: 'Market Fish Inspector v1.0.0'
+      is_draft:
+        description: 'Create as Draft Release'
+        type: boolean
+        required: false
+        default: false
+      is_prerelease:
+        description: 'Mark as Pre-release'
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release-apks:
+    name: Compile All Android APK Variants
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine Release Tag and Title
+        id: vars
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ inputs.tag_name }}" >> $GITHUB_OUTPUT
+            echo "title=${{ inputs.release_title }}" >> $GITHUB_OUTPUT
+          else
+            TAG="${GITHUB_REF#refs/tags/}"
+            echo "tag=$TAG" >> $GITHUB_OUTPUT
+            echo "title=Market Fish Inspector $TAG" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Install Project Dependencies
+        run: npm ci
+
+      - name: Run Quality Verification (Typecheck & Lint)
+        run: |
+          npx tsc --noEmit
+          npx expo lint
+
+      - name: Continuous Native Generation (Expo Prebuild)
+        run: npx expo prebuild --platform android --clean
+
+      - name: Compile Release APKs (Universal & Architecture Splits)
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Compile Debug APK
+        run: |
+          cd android
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Package and Rename Release Artifacts
+        run: |
+          TAG="${{ steps.vars.outputs.tag }}"
+          mkdir -p release-artifacts
+          
+          # Find and copy universal APK
+          find android/app/build/outputs/apk/release/ -type f -name "*universal*.apk" -exec cp {} "release-artifacts/Market-Fish-Inspector-${TAG}-universal.apk" \; || true
+          
+          # If universal apk wasn't matched with *universal*, fall back to app-release.apk
+          if [ ! -f "release-artifacts/Market-Fish-Inspector-${TAG}-universal.apk" ]; then
+            if [ -f "android/app/build/outputs/apk/release/app-release.apk" ]; then
+              cp "android/app/build/outputs/apk/release/app-release.apk" "release-artifacts/Market-Fish-Inspector-${TAG}-universal.apk"
+            fi
+          fi
+
+          # Find and copy ABI split APKs
+          find android/app/build/outputs/apk/release/ -type f -name "*arm64-v8a*.apk" -exec cp {} "release-artifacts/Market-Fish-Inspector-${TAG}-arm64-v8a.apk" \; || true
+          find android/app/build/outputs/apk/release/ -type f -name "*armeabi-v7a*.apk" -exec cp {} "release-artifacts/Market-Fish-Inspector-${TAG}-armeabi-v7a.apk" \; || true
+          find android/app/build/outputs/apk/release/ -type f -name "*x86_64*.apk" -exec cp {} "release-artifacts/Market-Fish-Inspector-${TAG}-x86_64.apk" \; || true
+
+          # Find and copy debug APK
+          if [ -f "android/app/build/outputs/apk/debug/app-debug.apk" ]; then
+            cp "android/app/build/outputs/apk/debug/app-debug.apk" "release-artifacts/Market-Fish-Inspector-${TAG}-debug.apk"
+          fi
+
+          echo "Generated APKs:"
+          ls -lh release-artifacts/
+
+          # Generate SHA256 Checksums
+          cd release-artifacts
+          sha256sum *.apk > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Upload Artifacts to Workflow Run
+        uses: actions/upload-artifact@v4
+        with:
+          name: market-fish-inspector-apks
+          path: release-artifacts/*
+          if-no-files-found: error
+
+      - name: Publish GitHub Release with APK Assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.vars.outputs.tag }}
+          name: ${{ steps.vars.outputs.title }}
+          draft: ${{ inputs.is_draft || false }}
+          prerelease: ${{ inputs.is_prerelease || false }}
+          files: |
+            release-artifacts/*.apk
+            release-artifacts/SHA256SUMS.txt
+          body: |
+            ## Market Fish Inspector (تشخیص هوشمند ماهی و سنجش تازگی)
+
+            Automated compilation for version **${{ steps.vars.outputs.tag }}** from commit `${{ github.sha }}`.
+
+            ### 📱 Download Android APKs (Assets):
+            - 🌟 **`Market-Fish-Inspector-${{ steps.vars.outputs.tag }}-universal.apk`**: **Universal APK** (Compatible with ALL Android devices — **Recommended**).
+            - ⚡ **`Market-Fish-Inspector-${{ steps.vars.outputs.tag }}-arm64-v8a.apk`**: Optimized for modern 64-bit Android smartphones.
+            - 📦 **`Market-Fish-Inspector-${{ steps.vars.outputs.tag }}-armeabi-v7a.apk`**: Optimized for older 32-bit Android phones.
+            - 💻 **`Market-Fish-Inspector-${{ steps.vars.outputs.tag }}-x86_64.apk`**: Optimized for Android emulators and ChromeOS tablets.
+            - 🛠️ **`Market-Fish-Inspector-${{ steps.vars.outputs.tag }}-debug.apk`**: Developer debug build.
+
+            ### 🔐 Integrity Checksums:
+            Checksums are provided in `SHA256SUMS.txt`.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

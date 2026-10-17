@@ -40,7 +40,8 @@
           "photosPermission": "The app accesses photos to identify fish species and inspect freshness.",
           "cameraPermission": "The app accesses the camera to identify fish species and inspect freshness in real time."
         }
-      ]
+      ],
+      "./plugins/withAndroidSplits.js"
     ]
   }
 }
