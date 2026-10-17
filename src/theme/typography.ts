@@ -21,20 +21,42 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
     fontLink.href = 'https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800;900&display=swap';
     document.head.appendChild(fontLink);
 
-    // 2. Global CSS font override for crisp Persian typography
+    // 2. Global CSS font configuration for crisp Persian typography + Ionicons web support
     const style = document.createElement('style');
     style.id = styleId;
     style.textContent = `
       @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800;900&display=swap');
 
-      *, *::before, *::after {
-        font-family: 'Vazirmatn', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+      @font-face {
+        font-family: 'Ionicons';
+        src: url('https://cdn.jsdelivr.net/npm/@expo/vector-icons@15.0.2/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf') format('truetype');
+        font-display: block;
       }
-      
-      body, input, textarea, select, button, div, span, p, h1, h2, h3, h4, h5, h6 {
-        font-family: 'Vazirmatn', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+
+      @font-face {
+        font-family: 'ionicons';
+        src: url('https://cdn.jsdelivr.net/npm/@expo/vector-icons@15.0.2/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf') format('truetype');
+        font-display: block;
+      }
+
+      html, body, #root {
+        font-family: 'Vazirmatn', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
+      }
+
+      input, textarea, select, button {
+        font-family: 'Vazirmatn', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      }
+
+      /* Protect vector icon glyphs from inheriting body font */
+      [style*="font-family: ionicons"],
+      [style*="font-family: Ionicons"],
+      [style*='font-family: "ionicons"'],
+      [style*='font-family: "Ionicons"'],
+      [style*="font-family: 'ionicons'"],
+      [style*="font-family: 'Ionicons'"] {
+        font-family: 'ionicons', 'Ionicons' !important;
       }
     `;
     document.head.appendChild(style);

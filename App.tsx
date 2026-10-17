@@ -11,6 +11,7 @@ import {
   Vazirmatn_700Bold,
   Vazirmatn_800ExtraBold,
 } from '@expo-google-fonts/vazirmatn';
+import { Ionicons } from '@expo/vector-icons';
 import './src/theme/typography';
 import { ThemeProvider, useAppTheme } from './src/theme/ThemeContext';
 import { LocaleProvider } from './src/localization/LocaleContext';
@@ -30,6 +31,9 @@ const MainApp: React.FC = () => {
 
 export default function App() {
   const [fontsLoaded] = useFonts({
+    ...Ionicons.font,
+    Ionicons: require('@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf'),
+    ionicons: require('@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf'),
     Vazirmatn_300Light,
     Vazirmatn_400Regular,
     Vazirmatn_500Medium,
