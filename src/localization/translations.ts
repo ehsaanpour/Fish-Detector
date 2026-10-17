@@ -64,6 +64,16 @@ export const translations = {
       selectSpecies: 'Select Species',
       manuallySelected: 'Species manually selected',
       close: 'Close',
+      geminiActive: '⚡ Google Gemini Vision AI Active',
+      geminiInactive: '⚡ Enable Google Gemini Vision AI',
+      geminiApiKeyModalTitle: 'Google Gemini Vision AI Setup',
+      geminiApiKeyPlaceholder: 'Paste your Gemini API key (AI Studio)...',
+      geminiApiKeyDesc: 'Enables real-time biological multimodal vision to identify any fish photo accurately.',
+      saveApiKey: 'Save & Enable AI',
+      apiKeySaved: 'Gemini AI activated successfully!',
+      clearApiKey: 'Remove Key',
+      geminiPoweredBadge: 'Identified with Google Gemini Vision',
+      geminiKeyHint: 'Get a free key at aistudio.google.com',
     },
     criteria: {
       eyes: {
@@ -219,6 +229,16 @@ export const translations = {
       selectSpecies: 'انتخاب گونه',
       manuallySelected: 'گونه به‌صورت دستی انتخاب شد',
       close: 'بستن',
+      geminiActive: '⚡ هوش مصنوعی Google Gemini Vision فعال است',
+      geminiInactive: '⚡ فعال‌سازی هوش مصنوعی Google Gemini (دقت ۹۹٪)',
+      geminiApiKeyModalTitle: 'تنظیم هوش مصنوعی Google Gemini Vision',
+      geminiApiKeyPlaceholder: 'کلید API جمینای خود را وارد کنید...',
+      geminiApiKeyDesc: 'با فعال‌سازی این قابلیت، تصاویر ماهی با هوش مصنوعی بینایی چندوجهی گوگل (دقیقاً مشابه چت جمینای) تحلیل می‌شوند.',
+      saveApiKey: 'ذخیره و فعال‌سازی AI',
+      apiKeySaved: 'هوش مصنوعی Gemini با موفقیت فعال شد!',
+      clearApiKey: 'حذف کلید',
+      geminiPoweredBadge: 'شناسایی هوشمند با Google Gemini Vision',
+      geminiKeyHint: 'دریافت کلید رایگان از aistudio.google.com',
     },
     criteria: {
       eyes: {

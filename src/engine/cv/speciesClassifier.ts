@@ -7,6 +7,7 @@ import {
   computeFlipHash,
   FishMorphologyCategory,
 } from './fishFingerprints';
+import { GeminiVisionService } from '../ai/geminiVisionService';
 
 export interface ClassificationMatch {
   species: FishSpecies;
@@ -26,6 +27,7 @@ export interface ImageAnalysisMeta {
   fileName?: string;
   width?: number;
   height?: number;
+  base64?: string;
 }
 
 export interface ImageOrientationOptions {
@@ -240,13 +242,16 @@ async function extractVisualFeatures(
   if (typeof window !== 'undefined' && typeof document !== 'undefined') {
     return new Promise((resolve) => {
       const img = new (window as any).Image();
-      img.crossOrigin = 'anonymous';
+      const isDataOrBlob = uri.startsWith('blob:') || uri.startsWith('data:');
+      if (!isDataOrBlob) {
+        img.crossOrigin = 'anonymous';
+      }
 
       const timeout = setTimeout(() => {
         resolve({
           aspectRatio: meta?.width && meta?.height ? meta.width / meta.height : undefined,
         });
-      }, 950);
+      }, 4000);
 
       img.onload = () => {
         clearTimeout(timeout);
@@ -430,7 +435,11 @@ async function extractVisualFeatures(
         });
       };
 
-      img.src = uri;
+      if (meta?.base64) {
+        img.src = `data:image/jpeg;base64,${meta.base64}`;
+      } else {
+        img.src = uri;
+      }
     });
   }
 
@@ -461,8 +470,26 @@ export async function classifyFishPhoto(
   meta?: ImageAnalysisMeta,
   orientation?: ImageOrientationOptions
 ): Promise<InspectionPrediction> {
-  // Rapid inference latency simulation (300-380ms)
-  await new Promise((resolve) => setTimeout(resolve, 350));
+  // 1. Check if Gemini Vision AI is configured and base64 image data is provided
+  let base64 = meta?.base64;
+  if (!base64 && imageUri.startsWith('data:image/')) {
+    const comma = imageUri.indexOf(',');
+    if (comma !== -1) base64 = imageUri.substring(comma + 1);
+  }
+
+  if (base64 && (await GeminiVisionService.isConfigured())) {
+    try {
+      const geminiPrediction = await GeminiVisionService.classifyFishWithGemini(base64);
+      if (geminiPrediction) {
+        return geminiPrediction;
+      }
+    } catch {
+      // Gracefully continue to local on-device CV engine
+    }
+  }
+
+  // Rapid inference latency simulation (250-350ms)
+  await new Promise((resolve) => setTimeout(resolve, 300));
 
   const semanticId = findSemanticMatch(imageUri, fileNameOrHint);
   const visual = await extractVisualFeatures(imageUri, meta, orientation);

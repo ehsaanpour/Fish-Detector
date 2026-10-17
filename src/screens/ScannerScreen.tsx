@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -23,6 +23,7 @@ import {
   InspectionPrediction,
   ImageAnalysisMeta,
 } from '../engine/cv/speciesClassifier';
+import { GeminiVisionService } from '../engine/ai/geminiVisionService';
 import { FishSpecies } from '../database/schema';
 import { ALL_FISH_SPECIES } from '../database/seedData';
 import { Ionicons } from '@expo/vector-icons';
@@ -54,6 +55,25 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isManuallyOverridden, setIsManuallyOverridden] = useState<boolean>(false);
 
+  // Google Gemini Vision AI Integration
+  const [isGeminiActive, setIsGeminiActive] = useState<boolean>(false);
+  const [showGeminiModal, setShowGeminiModal] = useState<boolean>(false);
+  const [geminiKeyInput, setGeminiKeyInput] = useState<string>('');
+  const [isUsedGemini, setIsUsedGemini] = useState<boolean>(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    GeminiVisionService.isConfigured().then((configured) => {
+      if (isMounted) setIsGeminiActive(configured);
+    });
+    GeminiVisionService.getApiKey().then((key) => {
+      if (isMounted && key) setGeminiKeyInput(key);
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const performClassification = async (
     uri: string,
     meta?: ImageAnalysisMeta,
@@ -68,6 +88,7 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({
       });
       setPrediction(pred);
       setIsManuallyOverridden(false);
+      setIsUsedGemini(isGeminiActive && !!meta?.base64);
     } catch {
       // Fallback in case of unexpected failure
       const fallbackPred = await classifyFishPhoto('local_simulated_scan');
@@ -79,37 +100,55 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({
 
   const handlePickImage = async (useCamera: boolean) => {
     try {
+      const pickerOptions = {
+        mediaTypes: ['images' as const],
+        allowsEditing: false,
+        quality: 0.85,
+        base64: true,
+      };
+
       let result;
       if (useCamera) {
         const { status } = await ImagePicker.requestCameraPermissionsAsync();
         if (status !== 'granted') {
-          // Open gallery if camera permission not granted
-          result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ['images'],
-            allowsEditing: false,
-            quality: 0.85,
-          });
+          result = await ImagePicker.launchImageLibraryAsync(pickerOptions);
         } else {
-          result = await ImagePicker.launchCameraAsync({
-            allowsEditing: false,
-            quality: 0.85,
-          });
+          result = await ImagePicker.launchCameraAsync(pickerOptions);
         }
       } else {
-        result = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ['images'],
-          allowsEditing: false,
-          quality: 0.85,
-        });
+        result = await ImagePicker.launchImageLibraryAsync(pickerOptions);
       }
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const asset = result.assets[0];
         const uri = asset.uri;
+
+        // Ensure base64 is available (convert blob to base64 on web if not provided)
+        let b64 = asset.base64;
+        if (!b64 && typeof window !== 'undefined' && uri.startsWith('blob:')) {
+          try {
+            const res = await fetch(uri);
+            const blob = await res.blob();
+            const reader = new FileReader();
+            const b64Promise = new Promise<string>((resolve) => {
+              reader.onloadend = () => {
+                const dataUrl = reader.result as string;
+                resolve(dataUrl.split(',')[1] || '');
+              };
+              reader.onerror = () => resolve('');
+            });
+            reader.readAsDataURL(blob);
+            b64 = await b64Promise;
+          } catch {
+            // Ignore blob read error
+          }
+        }
+
         const meta: ImageAnalysisMeta = {
           fileName: asset.fileName || undefined,
           width: asset.width,
           height: asset.height,
+          base64: b64 || undefined,
         };
 
         setImageUri(uri);
@@ -158,9 +197,29 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({
     setRotation(0);
     setIsFlipped(false);
     setIsManuallyOverridden(false);
+    setIsUsedGemini(false);
   };
 
-  const handleManualSelectFish = React.useCallback(
+  const handleSaveGeminiKey = async () => {
+    await GeminiVisionService.saveApiKey(geminiKeyInput);
+    const configured = await GeminiVisionService.isConfigured();
+    setIsGeminiActive(configured);
+    setShowGeminiModal(false);
+
+    // If an image is already loaded, re-classify with newly configured Gemini AI!
+    if (configured && imageUri && imageMeta) {
+      await performClassification(imageUri, imageMeta, rotation, isFlipped);
+    }
+  };
+
+  const handleClearGeminiKey = async () => {
+    await GeminiVisionService.saveApiKey('');
+    setGeminiKeyInput('');
+    setIsGeminiActive(false);
+    setShowGeminiModal(false);
+  };
+
+  const handleManualSelectFish = useCallback(
     (selected: FishSpecies) => {
       const now = Date.now();
       if (!prediction) {
@@ -222,6 +281,50 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({
       <HeaderBar title={t.scanner.title} />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+        {/* Gemini Vision AI Status & Quick Activation Banner */}
+        <View style={styles.bannerWrap}>
+          <TouchableOpacity
+            style={[
+              styles.geminiBanner,
+              {
+                backgroundColor: isGeminiActive
+                  ? 'rgba(14, 165, 233, 0.12)'
+                  : 'rgba(245, 158, 11, 0.12)',
+                borderColor: isGeminiActive ? colors.primary : '#F59E0B',
+                flexDirection: isRTL ? 'row-reverse' : 'row',
+              },
+            ]}
+            onPress={() => setShowGeminiModal(true)}
+            activeOpacity={0.8}
+          >
+            <Ionicons
+              name={isGeminiActive ? 'sparkles' : 'flash-outline'}
+              size={18}
+              color={isGeminiActive ? colors.primary : '#F59E0B'}
+            />
+            <View style={{ flex: 1, paddingHorizontal: 8, alignItems: isRTL ? 'flex-end' : 'flex-start' }}>
+              <Text
+                style={[
+                  styles.geminiBannerTitle,
+                  { color: isGeminiActive ? colors.primary : '#F59E0B' },
+                ]}
+              >
+                {isGeminiActive ? t.scanner.geminiActive : t.scanner.geminiInactive}
+              </Text>
+              <Text style={[styles.geminiBannerSub, { color: colors.textMuted }]}>
+                {isGeminiActive
+                  ? (isRTL ? 'هوش مصنوعی بینایی گوگل فعال است' : 'Google Gemini Vision connected')
+                  : (isRTL ? 'کلیک برای فعال‌سازی رایگان هوش مصنوعی' : 'Tap to enable free Gemini API')}
+              </Text>
+            </View>
+            <Ionicons
+              name={isGeminiActive ? 'settings-outline' : 'chevron-forward'}
+              size={16}
+              color={isGeminiActive ? colors.primary : '#F59E0B'}
+            />
+          </TouchableOpacity>
+        </View>
+
         {/* Camera / Viewfinder Box */}
         <View style={styles.viewfinderSection}>
           <View style={[styles.viewfinderBox, { backgroundColor: '#0A1118' }]}>
@@ -357,7 +460,11 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({
                 styles.resultCard,
                 {
                   backgroundColor: colors.surface,
-                  borderColor: isManuallyOverridden ? colors.accentTeal : colors.primary,
+                  borderColor: isManuallyOverridden
+                    ? colors.accentTeal
+                    : isUsedGemini
+                    ? '#0284C7'
+                    : colors.primary,
                 },
               ]}
             >
@@ -374,23 +481,39 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({
                     {
                       backgroundColor: isManuallyOverridden
                         ? 'rgba(20, 184, 166, 0.15)'
+                        : isUsedGemini
+                        ? 'rgba(14, 165, 233, 0.15)'
                         : colors.badgeBg,
                     },
                   ]}
                 >
                   <Ionicons
-                    name="checkmark-circle"
+                    name={isUsedGemini ? 'sparkles' : 'checkmark-circle'}
                     size={16}
-                    color={isManuallyOverridden ? colors.accentTeal : colors.primary}
+                    color={
+                      isManuallyOverridden
+                        ? colors.accentTeal
+                        : isUsedGemini
+                        ? '#0284C7'
+                        : colors.primary
+                    }
                   />
                   <Text
                     style={[
                       styles.matchConfidence,
-                      { color: isManuallyOverridden ? colors.accentTeal : colors.primary },
+                      {
+                        color: isManuallyOverridden
+                          ? colors.accentTeal
+                          : isUsedGemini
+                          ? '#0284C7'
+                          : colors.primary,
+                      },
                     ]}
                   >
                     {isManuallyOverridden
                       ? t.scanner.manuallySelected
+                      : isUsedGemini
+                      ? `${t.scanner.geminiPoweredBadge} (${formatNumber(prediction.topMatch.confidence)}%)`
                       : `${formatNumber(prediction.topMatch.confidence)}% ${t.scanner.confidence}`}
                   </Text>
                 </View>
@@ -554,7 +677,6 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({
       >
         <View style={styles.modalBackdrop}>
           <View style={[styles.modalContent, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            {/* Modal Header */}
             <View
               style={[
                 styles.modalHeader,
@@ -572,7 +694,6 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({
               </TouchableOpacity>
             </View>
 
-            {/* Search Input */}
             <View
               style={[
                 styles.searchBox,
@@ -605,7 +726,6 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({
               )}
             </View>
 
-            {/* Species List */}
             <FlatList
               data={filteredSpecies}
               keyExtractor={(item) => item.id}
@@ -653,6 +773,98 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({
           </View>
         </View>
       </Modal>
+
+      {/* Google Gemini Vision AI Setup Modal */}
+      <Modal
+        visible={showGeminiModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowGeminiModal(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.modalContent, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View
+              style={[
+                styles.modalHeader,
+                { flexDirection: isRTL ? 'row-reverse' : 'row' },
+              ]}
+            >
+              <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons name="sparkles" size={20} color={colors.primary} />
+                <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>
+                  {t.scanner.geminiApiKeyModalTitle}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setShowGeminiModal(false)}
+                style={styles.modalCloseBtn}
+              >
+                <Ionicons name="close" size={22} color={colors.textPrimary} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={[styles.modalDesc, { color: colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>
+              {t.scanner.geminiApiKeyDesc}
+            </Text>
+
+            <View
+              style={[
+                styles.geminiInputWrap,
+                {
+                  backgroundColor: colors.surfaceSubtle,
+                  borderColor: colors.border,
+                  flexDirection: isRTL ? 'row-reverse' : 'row',
+                },
+              ]}
+            >
+              <Ionicons name="key-outline" size={18} color={colors.textMuted} />
+              <TextInput
+                style={[
+                  styles.geminiInput,
+                  {
+                    color: colors.textPrimary,
+                    textAlign: isRTL ? 'right' : 'left',
+                  },
+                ]}
+                placeholder={t.scanner.geminiApiKeyPlaceholder}
+                placeholderTextColor={colors.textMuted}
+                value={geminiKeyInput}
+                onChangeText={setGeminiKeyInput}
+                autoCapitalize="none"
+                autoCorrect={false}
+                secureTextEntry={false}
+              />
+            </View>
+
+            <Text style={[styles.geminiHintText, { color: colors.primary, textAlign: isRTL ? 'right' : 'left' }]}>
+              {t.scanner.geminiKeyHint}
+            </Text>
+
+            <View style={styles.modalActionRow}>
+              <TouchableOpacity
+                style={[styles.geminiSaveBtn, { backgroundColor: colors.primary }]}
+                onPress={handleSaveGeminiKey}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="checkmark-done" size={18} color="#FFFFFF" />
+                <Text style={styles.geminiSaveBtnText}>{t.scanner.saveApiKey}</Text>
+              </TouchableOpacity>
+
+              {isGeminiActive && (
+                <TouchableOpacity
+                  style={[styles.geminiClearBtn, { borderColor: colors.border }]}
+                  onPress={handleClearGeminiKey}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.geminiClearBtnText, { color: '#EF4444' }]}>
+                    {t.scanner.clearApiKey}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -661,9 +873,30 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  bannerWrap: {
+    paddingHorizontal: 16,
+    paddingTop: 10,
+  },
+  geminiBanner: {
+    borderRadius: 14,
+    borderWidth: 1.5,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    alignItems: 'center',
+    gap: 10,
+  },
+  geminiBannerTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  geminiBannerSub: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 2,
+  },
   viewfinderSection: {
     paddingHorizontal: 16,
-    paddingTop: 14,
+    paddingTop: 12,
   },
   viewfinderBox: {
     width: '100%',
@@ -926,7 +1159,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    maxHeight: '80%',
+    maxHeight: '82%',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     borderWidth: 1,
@@ -940,6 +1173,11 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 16,
     fontWeight: '800',
+  },
+  modalDesc: {
+    fontSize: 12,
+    lineHeight: 18,
+    marginBottom: 14,
   },
   modalCloseBtn: {
     padding: 4,
@@ -976,5 +1214,51 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     marginTop: 2,
+  },
+  geminiInputWrap: {
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  geminiInput: {
+    flex: 1,
+    fontSize: 13,
+    paddingVertical: 4,
+  },
+  geminiHintText: {
+    fontSize: 11,
+    fontWeight: '700',
+    marginBottom: 16,
+  },
+  modalActionRow: {
+    gap: 8,
+  },
+  geminiSaveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
+  },
+  geminiSaveBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  geminiClearBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  geminiClearBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
   },
 });
