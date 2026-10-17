@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { FishSpecies } from '../database/schema';
 import { useAppTheme } from '../theme/ThemeContext';
@@ -30,7 +31,14 @@ export const FishDetailScreen: React.FC<FishDetailScreenProps> = ({
 }) => {
   const { colors } = useAppTheme();
   const { isRTL, t, formatCurrency } = useAppLocale();
-  const { currency, getPriceForFish, updateCustomPrice } = useAppCurrency();
+  const {
+    currency,
+    getPriceForFish,
+    updateCustomPrice,
+    clearCustomPrice,
+    refreshAiPriceForFish,
+    isRefreshingAiPrice,
+  } = useAppCurrency();
 
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [highlightZone, setHighlightZone] = useState<'eyes' | 'gills' | 'skin' | 'flesh' | null>(null);
@@ -296,48 +304,123 @@ export const FishDetailScreen: React.FC<FishDetailScreenProps> = ({
           </View>
         </View>
 
-        {/* Market Price & Local Edit Card */}
-        <View style={[styles.contentCard, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}>
+        {/* Market Price & AI Live Intelligence Card */}
+        <View style={[styles.contentCard, { backgroundColor: colors.surface, borderColor: priceInfo.isAi ? '#0284C7' : colors.borderSubtle }]}>
           <View
             style={[
               styles.cardHeaderRow,
               { flexDirection: isRTL ? 'row-reverse' : 'row' },
             ]}
           >
-            <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>
-              {t.details.marketPrice}
-            </Text>
-            <TouchableOpacity
-              onPress={() => setIsEditingPrice(!isEditingPrice)}
-              style={[styles.editPriceBtn, { backgroundColor: colors.surfaceSubtle }]}
-            >
-              <Ionicons name="create-outline" size={15} color={colors.primary} />
-              <Text style={[styles.editPriceText, { color: colors.primary }]}>
-                {t.details.customPrice}
+            <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
+              <Ionicons
+                name={priceInfo.isAi ? 'sparkles' : 'pricetag'}
+                size={16}
+                color={priceInfo.isAi ? '#0284C7' : colors.primary}
+              />
+              <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>
+                {t.details.marketPrice}
               </Text>
-            </TouchableOpacity>
+            </View>
+
+            <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 8 }}>
+              {/* Refresh with Gemini AI Button */}
+              <TouchableOpacity
+                onPress={() => refreshAiPriceForFish(fish)}
+                disabled={isRefreshingAiPrice}
+                style={[styles.refreshAiDetailBtn, { backgroundColor: colors.surfaceSubtle, borderColor: colors.border }]}
+              >
+                {isRefreshingAiPrice ? (
+                  <ActivityIndicator size="small" color="#0284C7" />
+                ) : (
+                  <>
+                    <Ionicons name="sync" size={13} color="#0284C7" />
+                    <Text style={[styles.refreshAiDetailText, { color: '#0284C7' }]}>
+                      {t.details.refreshAiPrice}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => setIsEditingPrice(!isEditingPrice)}
+                style={[styles.editPriceBtn, { backgroundColor: colors.surfaceSubtle }]}
+              >
+                <Ionicons name="create-outline" size={14} color={colors.primary} />
+                <Text style={[styles.editPriceText, { color: colors.primary }]}>
+                  {t.details.customPrice}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
+          {/* Big Price Display Row with AI / Custom Badge */}
           <View
             style={[
               styles.priceDisplayRow,
               { flexDirection: isRTL ? 'row-reverse' : 'row' },
             ]}
           >
-            <Text style={[styles.bigPrice, { color: colors.primary }]}>
+            <Text style={[styles.bigPrice, { color: priceInfo.isAi ? '#0284C7' : colors.primary }]}>
               {formatCurrency(priceInfo.price, currency)}
             </Text>
             <Text style={[styles.perKgUnit, { color: colors.textMuted }]}>
               {t.home.perKg}
             </Text>
-            {priceInfo.isCustom && (
+            {priceInfo.isCustom ? (
               <View style={[styles.customBadge, { backgroundColor: colors.badgeBg }]}>
                 <Text style={[styles.customBadgeText, { color: colors.badgeText }]}>
                   {isRTL ? 'نرخ کاربر' : 'Custom'}
                 </Text>
               </View>
-            )}
+            ) : priceInfo.isAi ? (
+              <View style={[styles.aiLiveBadge, { backgroundColor: 'rgba(2, 132, 199, 0.12)' }]}>
+                <Ionicons name="sparkles" size={12} color="#0284C7" />
+                <Text style={[styles.aiLiveBadgeText, { color: '#0284C7' }]}>
+                  {isRTL ? 'هوش مصنوعی جمنای' : 'Gemini AI'}
+                </Text>
+              </View>
+            ) : null}
           </View>
+
+          {/* Min & Max Price Range */}
+          {priceInfo.minPriceToman && priceInfo.maxPriceToman ? (
+            <View
+              style={[
+                styles.detailPriceRangeRow,
+                { flexDirection: isRTL ? 'row-reverse' : 'row' },
+              ]}
+            >
+              <Ionicons name="analytics-outline" size={14} color="#0284C7" />
+              <Text style={[styles.metaLabel, { color: colors.textMuted }]}>
+                {t.details.marketRange}:
+              </Text>
+              <Text style={[styles.metaVal, { color: colors.textPrimary, fontWeight: '700' }]}>
+                {formatCurrency(priceInfo.minPriceToman, 'toman')} {isRTL ? 'تا' : 'to'} {formatCurrency(priceInfo.maxPriceToman, 'toman')} {t.home.perKg}
+              </Text>
+            </View>
+          ) : null}
+
+          {/* AI Market Context Notes */}
+          {Boolean(isRTL ? priceInfo.marketNotesFa : priceInfo.marketNotesEn) && (
+            <View style={[styles.detailAiNotesBox, { backgroundColor: colors.surfaceSubtle }]}>
+              <Text style={[styles.detailAiNotesText, { color: colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>
+                💡 {isRTL ? priceInfo.marketNotesFa : priceInfo.marketNotesEn}
+              </Text>
+            </View>
+          )}
+
+          {/* Reset custom price button if custom is set */}
+          {priceInfo.isCustom && (
+            <TouchableOpacity
+              onPress={() => clearCustomPrice(fish.id)}
+              style={[styles.resetDetailCustomBtn, { backgroundColor: colors.surfaceSubtle }]}
+            >
+              <Text style={[styles.resetDetailCustomText, { color: colors.textMuted }]}>
+                {t.details.resetCustomPrice}
+              </Text>
+            </TouchableOpacity>
+          )}
 
           {isEditingPrice && (
             <View style={[styles.priceEditForm, { borderTopColor: colors.borderSubtle }]}>
@@ -644,5 +727,60 @@ const styles = StyleSheet.create({
   actionSecondaryText: {
     fontSize: 13,
     fontWeight: '700',
+  },
+  refreshAiDetailBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  refreshAiDetailText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  aiLiveBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginLeft: 6,
+  },
+  aiLiveBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  detailPriceRangeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 0.5,
+    borderTopColor: 'rgba(150, 150, 150, 0.2)',
+  },
+  detailAiNotesBox: {
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 10,
+  },
+  detailAiNotesText: {
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  resetDetailCustomBtn: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 6,
+    marginTop: 8,
+  },
+  resetDetailCustomText: {
+    fontSize: 11,
+    fontWeight: '600',
   },
 });

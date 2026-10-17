@@ -167,7 +167,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </TouchableOpacity>
         </View>
 
-        {/* Offline Species Count Header */}
+        {/* Offline Species Count Header & AI Pricing Indicator */}
         <View
           style={[
             styles.countRow,
@@ -177,10 +177,21 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <Text style={[styles.sectionHeading, { color: colors.textPrimary }]}>
             {t.home.allFishTitle}
           </Text>
-          <View style={[styles.countBadge, { backgroundColor: colors.surfaceSubtle }]}>
-            <Text style={[styles.countBadgeText, { color: colors.primary }]}>
-              {formatNumber(filteredSpecies.length)} {isRTL ? 'گونه آفلاین' : 'species'}
-            </Text>
+          <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
+            <View style={[styles.countBadge, { backgroundColor: 'rgba(2, 132, 199, 0.12)' }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Ionicons name="sparkles" size={11} color="#0284C7" />
+                <Text style={[styles.countBadgeText, { color: '#0284C7' }]}>
+                  {isRTL ? 'قیمت‌گذاری AI' : 'AI Pricing'}
+                </Text>
+              </View>
+            </View>
+
+            <View style={[styles.countBadge, { backgroundColor: colors.surfaceSubtle }]}>
+              <Text style={[styles.countBadgeText, { color: colors.primary }]}>
+                {formatNumber(filteredSpecies.length)} {isRTL ? 'گونه' : 'species'}
+              </Text>
+            </View>
           </View>
         </View>
 

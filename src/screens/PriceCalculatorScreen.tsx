@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   Modal,
   FlatList,
+  ActivityIndicator,
 } from 'react-native';
 import { useAppTheme } from '../theme/ThemeContext';
 import { useAppLocale } from '../localization/LocaleContext';
@@ -30,7 +31,13 @@ export const PriceCalculatorScreen: React.FC<PriceCalculatorScreenProps> = ({
 }) => {
   const { colors } = useAppTheme();
   const { isRTL, t, formatNumber, formatCurrency } = useAppLocale();
-  const { currency, getPriceForFish } = useAppCurrency();
+  const {
+    currency,
+    getPriceForFish,
+    refreshAiPriceForFish,
+    isRefreshingAiPrice,
+    clearCustomPrice,
+  } = useAppCurrency();
 
   const allSpecies = dbService.getAllSpecies();
   const [selectedFish, setSelectedFish] = useState<FishSpecies>(
@@ -49,8 +56,8 @@ export const PriceCalculatorScreen: React.FC<PriceCalculatorScreenProps> = ({
 
   const calcResult = calculateFishCost(
     numericGrams,
-    selectedFish.defaultPriceToman,
-    selectedFish.defaultPriceUsd
+    priceInfo.priceToman,
+    priceInfo.priceUsd
   );
 
   const quickWeights = [
@@ -115,6 +122,130 @@ export const PriceCalculatorScreen: React.FC<PriceCalculatorScreenProps> = ({
 
             <Ionicons name="swap-vertical" size={20} color={colors.primary} />
           </TouchableOpacity>
+        </View>
+
+        {/* Gemini AI Live Market Card */}
+        <View style={styles.sectionWrap}>
+          <View
+            style={[
+              styles.aiPriceCard,
+              {
+                backgroundColor: colors.surface,
+                borderColor: priceInfo.isAi ? '#0284C7' : colors.borderSubtle,
+              },
+            ]}
+          >
+            {/* Header: AI Badge & Refresh Button */}
+            <View
+              style={[
+                styles.aiPriceHeader,
+                { flexDirection: isRTL ? 'row-reverse' : 'row' },
+              ]}
+            >
+              <View
+                style={[
+                  styles.aiBadgeTag,
+                  {
+                    backgroundColor: priceInfo.isCustom
+                      ? colors.badgeBg
+                      : 'rgba(2, 132, 199, 0.12)',
+                  },
+                ]}
+              >
+                <Ionicons
+                  name={priceInfo.isCustom ? 'create-outline' : 'sparkles'}
+                  size={14}
+                  color={priceInfo.isCustom ? colors.badgeText : '#0284C7'}
+                />
+                <Text
+                  style={[
+                    styles.aiBadgeTagText,
+                    { color: priceInfo.isCustom ? colors.badgeText : '#0284C7' },
+                  ]}
+                >
+                  {priceInfo.isCustom
+                    ? (isRTL ? 'نرخ دستی کاربر' : 'Custom User Price')
+                    : t.calculator.aiMarketRateBadge}
+                </Text>
+              </View>
+
+              <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 8 }}>
+                {priceInfo.isCustom && (
+                  <TouchableOpacity
+                    style={[styles.resetCustomBtn, { backgroundColor: colors.surfaceSubtle }]}
+                    onPress={() => clearCustomPrice(selectedFish.id)}
+                  >
+                    <Text style={[styles.resetCustomBtnText, { color: colors.textMuted }]}>
+                      {t.calculator.resetCustomPrice}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+
+                <TouchableOpacity
+                  style={[
+                    styles.refreshAiBtn,
+                    {
+                      backgroundColor: colors.surfaceSubtle,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                  onPress={() => refreshAiPriceForFish(selectedFish)}
+                  disabled={isRefreshingAiPrice}
+                >
+                  {isRefreshingAiPrice ? (
+                    <ActivityIndicator size="small" color="#0284C7" />
+                  ) : (
+                    <>
+                      <Ionicons name="sync" size={13} color="#0284C7" />
+                      <Text style={[styles.refreshAiBtnText, { color: '#0284C7' }]}>
+                        {t.calculator.refreshAiPrice}
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Price Range */}
+            {priceInfo.minPriceToman && priceInfo.maxPriceToman ? (
+              <View
+                style={[
+                  styles.priceRangeRow,
+                  { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                ]}
+              >
+                <Ionicons name="analytics-outline" size={14} color="#0284C7" />
+                <Text style={[styles.priceRangeLabel, { color: colors.textMuted }]}>
+                  {t.calculator.marketRange}:
+                </Text>
+                <Text style={[styles.priceRangeValue, { color: colors.textPrimary }]}>
+                  {formatCurrency(priceInfo.minPriceToman, 'toman')} {isRTL ? 'تا' : 'to'} {formatCurrency(priceInfo.maxPriceToman, 'toman')} {t.home.perKg}
+                </Text>
+              </View>
+            ) : null}
+
+            {/* AI Market Notes / Context */}
+            {Boolean(isRTL ? priceInfo.marketNotesFa : priceInfo.marketNotesEn) && (
+              <View
+                style={[
+                  styles.aiNotesBox,
+                  { backgroundColor: colors.surfaceSubtle },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.aiNotesText,
+                    {
+                      color: colors.textSecondary,
+                      textAlign: isRTL ? 'right' : 'left',
+                    },
+                  ]}
+                >
+                  💡 {isRTL ? priceInfo.marketNotesFa : priceInfo.marketNotesEn}
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
 
         {/* Weight Input Box */}
@@ -329,33 +460,50 @@ export const PriceCalculatorScreen: React.FC<PriceCalculatorScreenProps> = ({
             <FlatList
               data={filteredPickerSpecies}
               keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={[
-                    styles.pickerItem,
-                    {
-                      borderBottomColor: colors.borderSubtle,
-                      flexDirection: isRTL ? 'row-reverse' : 'row',
-                    },
-                  ]}
-                  onPress={() => {
-                    setSelectedFish(item);
-                    setIsPickerVisible(false);
-                  }}
-                >
-                  <View style={{ flex: 1, alignItems: isRTL ? 'flex-end' : 'flex-start' }}>
-                    <Text style={[styles.pickerItemName, { color: colors.textPrimary }]}>
-                      {isRTL ? item.nameFa : item.nameEn}
-                    </Text>
-                    <Text style={[styles.pickerItemSub, { color: colors.textMuted }]}>
-                      {item.scientificName}
-                    </Text>
-                  </View>
-                  <Text style={[styles.pickerItemPrice, { color: colors.primary }]}>
-                    {formatCurrency(item.defaultPriceToman, 'toman')}
-                  </Text>
-                </TouchableOpacity>
-              )}
+              renderItem={({ item }) => {
+                const itemPriceInfo = getPriceForFish(
+                  item.id,
+                  item.defaultPriceToman,
+                  item.defaultPriceUsd
+                );
+                return (
+                  <TouchableOpacity
+                    style={[
+                      styles.pickerItem,
+                      {
+                        borderBottomColor: colors.borderSubtle,
+                        flexDirection: isRTL ? 'row-reverse' : 'row',
+                      },
+                    ]}
+                    onPress={() => {
+                      setSelectedFish(item);
+                      setIsPickerVisible(false);
+                    }}
+                  >
+                    <View style={{ flex: 1, alignItems: isRTL ? 'flex-end' : 'flex-start' }}>
+                      <Text style={[styles.pickerItemName, { color: colors.textPrimary }]}>
+                        {isRTL ? item.nameFa : item.nameEn}
+                      </Text>
+                      <Text style={[styles.pickerItemSub, { color: colors.textMuted }]}>
+                        {item.scientificName}
+                      </Text>
+                    </View>
+                    <View style={{ alignItems: isRTL ? 'flex-start' : 'flex-end' }}>
+                      <Text style={[styles.pickerItemPrice, { color: itemPriceInfo.isAi ? '#0284C7' : colors.primary }]}>
+                        {formatCurrency(itemPriceInfo.price, currency)}
+                      </Text>
+                      {itemPriceInfo.isAi && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 2 }}>
+                          <Ionicons name="sparkles" size={10} color="#0284C7" />
+                          <Text style={{ fontSize: 10, color: '#0284C7', fontWeight: '700' }}>
+                            {isRTL ? 'هوش مصنوعی' : 'AI Rate'}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                );
+              }}
             />
           </View>
         </View>
@@ -540,5 +688,73 @@ const styles = StyleSheet.create({
   pickerItemPrice: {
     fontSize: 12,
     fontWeight: '800',
+  },
+  aiPriceCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 14,
+    gap: 10,
+  },
+  aiPriceHeader: {
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  aiBadgeTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  aiBadgeTagText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  refreshAiBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  refreshAiBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  resetCustomBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 6,
+  },
+  resetCustomBtnText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  priceRangeRow: {
+    alignItems: 'center',
+    gap: 6,
+    paddingTop: 2,
+  },
+  priceRangeLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  priceRangeValue: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  aiNotesBox: {
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 2,
+  },
+  aiNotesText: {
+    fontSize: 12,
+    lineHeight: 18,
   },
 });

@@ -2,6 +2,10 @@ import { FishSpecies } from '../../database/schema';
 import { ALL_FISH_SPECIES } from '../../database/seedData';
 import { calculateFreshness, FreshnessInput, FreshnessResult } from '../freshnessGrader';
 import { GeminiVisionService } from '../ai/geminiVisionService';
+import { AiFishPrice, GeminiPricingService } from '../ai/geminiPricingService';
+import { SPECIES_EXTRA_ALIASES } from './speciesAliases';
+
+export { SPECIES_EXTRA_ALIASES };
 
 export interface ClassificationMatch {
   species: FishSpecies;
@@ -15,6 +19,7 @@ export interface InspectionPrediction {
   alternatives: ClassificationMatch[];
   automatedFreshnessEstimate: FreshnessInput;
   aiFreshnessResult?: FreshnessResult;
+  aiPrice?: AiFishPrice;
   scanTimestamp: number;
   detectedWithAI: boolean;
   requiresApiKey?: boolean;
@@ -38,56 +43,6 @@ export interface ImageOrientationOptions {
 function normalizeToken(str: string): string {
   return str.toLowerCase().replace(/[^a-z0-9\u0600-\u06FF]/g, '');
 }
-
-// Aliases and synonyms across English, Latin, Persian, and Southern dialects for catalog matching
-const SPECIES_EXTRA_ALIASES: Record<string, string[]> = {
-  dolmi: ['barracuda', 'greatbarracuda', 'cuda', 'dolmi', 'kootar', 'sphyraena', 'jello', 'کوتر', 'دولمی', 'باراکودا', 'ماهیدولمی', 'ماهیکوتر', 'ماهیباراکودا'],
-  cod: ['cod', 'atlanticcod', 'morhua', 'gadus', 'کاد', 'ماهیکاد', 'ماهیسفیداروپایی'],
-  zobaidi: ['zobaidi', 'zubaidi', 'argenteus', 'pomfret', 'silverpomfret', 'pampus', 'زبیدی', 'حلواسفید', 'ماهیزبیدی', 'ماهیحلواسفید'],
-  halva_siah: ['halvasiah', 'blackpomfret', 'parastromateus', 'niger', 'حلواسیاه', 'ماهیحلواسیاه'],
-  shir: ['shir', 'commerson', 'kingfish', 'narrowbarred', 'spanishmackerel', 'شیر', 'ماهیشیر', 'شیرجنوب', 'شیرماهی'],
-  ghobad: ['ghobad', 'ghobada', 'guttatus', 'kingmackerel', 'seerfish', 'قباد', 'ماهیقباد'],
-  sakan: ['sakan', 'cobia', 'canadum', 'rachycentron', 'blackkingfish', 'سکن', 'ماهیسکن', 'سوکلا'],
-  sorkhoo: ['sorkhoo', 'redsnapper', 'snapper', 'erythropterus', 'lutjanus', 'سرخو', 'ماهیسرخو'],
-  hamour: ['hamour', 'hamoor', 'grouper', 'coioides', 'epinephelus', 'هامور', 'ماهیهامور'],
-  sangsar: ['sangsar', 'kaakan', 'javelin', 'grunter', 'pomadasys', 'سنگسر', 'ماهیسنگسر'],
-  sobaity: ['sobaity', 'subaity', 'sparidentex', 'hasta', 'صبیتی', 'ماهیصبیتی'],
-  shank: ['shank', 'bifasciatus', 'acanthopagrus', 'twobar', 'seabream', 'شانک', 'ماهیشانک'],
-  shahri: ['shahri', 'nebulosus', 'lethrinus', 'emperor', 'spangled', 'شهری', 'ماهیشهری'],
-  rashgoo: ['rashgoo', 'fourfinger', 'threadfin', 'tetradactylum', 'eleutheronema', 'راشگو', 'ماهیراشگو'],
-  shoorideh: ['shoorideh', 'croaker', 'otolithes', 'ruber', 'tigertooth', 'شوریده', 'ماهیشوریده'],
-  kharoo: ['kharoo', 'wolfherring', 'dorab', 'chirocentrus', 'خارو', 'ماهیخارو'],
-  sarem: ['sarem', 'queenfish', 'commersonnianus', 'scomberoides', 'talang', 'سارم', 'ماهیسارم'],
-  talal: ['talal', 'kanagurta', 'indianmackerel', 'rastrelliger', 'طلال', 'ماهیطلال'],
-  gish: ['gish', 'djedaba', 'yellowtailscad', 'alepes', 'scad', 'گیش', 'ماهیگیش', 'جش'],
-  soltan_ebrahim: ['soltanebrahim', 'ebrahim', 'nemipterus', 'japonicus', 'threadfinbream', 'سلطانابراهیم', 'ماهیسلطانابراهیم'],
-  mahimahi: ['mahimahi', 'mahi-mahi', 'mahi_mahi', 'dolphinfish', 'dorado', 'coryphaena', 'hippurus', 'عنزه', 'ماهیعنزه', 'ماهیماهی', 'مایمای', 'دلفینماهی', 'شمس', 'گالیت'],
-  zardeh: ['zardeh', 'kawakawa', 'euthynnus', 'affinis', 'mackereltuna', 'زرده', 'ماهیزرده', 'تنزرده', 'تندریا'],
-  hoor: ['hoor', 'tonggol', 'longtailtuna', 'tuna', 'thunnus', 'هوور', 'ماهیهوور', 'تن', 'گیدر'],
-  skipjack: ['skipjack', 'pelamis', 'katsuwonus', 'هوورمسقطی', 'مسقطی', 'گیدرخطدار'],
-  yellowfin_tuna: ['yellowfin', 'albacares', 'گیدر', 'ماهیگیدر', 'تونزرد'],
-  seebass_jonoob: ['barramundi', 'calcarifer', 'lates', 'seebass', 'asianseabass', 'سیباس', 'سیباسجنوب'],
-  european_seabass: ['branzino', 'labrax', 'dicentrarchus', 'seabass', 'سیباساروپایی', 'برانزینو'],
-  kafshak: ['kafshak', 'cynoglossus', 'tonguesole', 'solea', 'sole', 'flatfish', 'کفشک', 'ماهیکفشک', 'زبانگاو', 'لسانالثور'],
-  ordak_mahi: ['ordakmahi', 'lucius', 'northernpike', 'pike', 'esox', 'اردکماهی', 'شوک'],
-  kilka: ['kilka', 'caspia', 'clupeonella', 'sprat', 'کیلکا', 'ماهیکیلکا'],
-  kutum: ['kutum', 'caspiankutum', 'whitefish', 'rutilus', 'ماهیسفید', 'سفیدخزر'],
-  ghezelala: ['ghezelala', 'trout', 'rainbowtrout', 'mykiss', 'oncorhynchus', 'قزل', 'قزلآلا', 'قزل_آلا'],
-  kapoor: ['kapoor', 'carp', 'carpio', 'cyprinus', 'کپور', 'کپورمعمولی', 'ماهیکپور'],
-  souf: ['souf', 'lucioperca', 'pikeperch', 'zander', 'sander', 'سوف', 'سوفسفید', 'ماهیسوف'],
-  ozonboron: ['ozonboron', 'stellatus', 'sturgeon', 'acipenser', 'اوزونبرون', 'ازونبرون'],
-  kefal_khazar: ['kefal', 'auratus', 'mullet', 'chelon', 'کفال', 'کفالخزر', 'ماهیکفال'],
-  azad_khazar: ['azad', 'salmotrutta', 'caspiansalmon', 'ماهیآزاد', 'آزادخزر'],
-  atlantic_salmon: ['salmon', 'atlanticsalmon', 'salar', 'salmo', 'سالامون', 'سالمون'],
-  tilapia: ['tilapia', 'niloticus', 'oreochromis', 'تیلاپیا', 'ماهیتیلاپیا'],
-  dorade: ['dorade', 'aurata', 'sparus', 'gilthead', 'دندیس', 'شانکاروپایی'],
-  swordfish: ['swordfish', 'gladius', 'xiphias', 'شمشیرماهی'],
-  mackerel_sardine: ['sardine', 'mackerel', 'scomber', 'ساردین', 'ماهیساردین'],
-  halibut: ['halibut', 'hippoglossus', 'هالیبوت', 'لوزیماهی'],
-  haddock: ['haddock', 'aeglefinus', 'melanogrammus', 'هادوک'],
-  meyd: ['meyd', 'klunzingeri', 'liza', 'مید', 'ماهیمید'],
-  zaminkan: ['zaminkan', 'indicus', 'platycephalus', 'flathead', 'زمینکن', 'ماهیزمینکن'],
-};
 
 const GEOGRAPHIC_STOPWORDS = new Set([
   'fish', 'the', 'sea', 'ocean', 'and', 'water', 'persian', 'gulf', 'caspian',
@@ -132,28 +87,64 @@ export async function getTransformedBase64(
   const rotation = orientation?.rotation || 0;
   const isFlipped = !!orientation?.isFlipped;
 
-  // If no rotation and no flip, and base64 is already provided, return it directly
-  if (rotation === 0 && !isFlipped && existingBase64) {
+  // Fast path: if no rotation/flip and base64 is already reasonably sized (<600KB), return immediately
+  if (rotation === 0 && !isFlipped && existingBase64 && existingBase64.length < 600000) {
     return existingBase64;
   }
 
-  // Use HTML5 Canvas if running in Web browser environment
+  // Use HTML5 Canvas if running in Web browser environment to downsample & orient
   if (typeof document !== 'undefined') {
     return new Promise((resolve) => {
+      let resolved = false;
+      const done = (val: string | null) => {
+        if (!resolved) {
+          resolved = true;
+          clearTimeout(timeoutId);
+          resolve(val);
+        }
+      };
+
+      // 2.0s timeout safety guard against hung images or broken cross-origin requests
+      const timeoutId = setTimeout(() => {
+        done(existingBase64 || null);
+      }, 2000);
+
       const img = new Image();
-      if (!imageUri.startsWith('blob:') && !imageUri.startsWith('data:')) {
+      // Use data URL directly when existingBase64 is available to prevent CORS blocks
+      const srcToLoad = existingBase64
+        ? `data:image/jpeg;base64,${existingBase64}`
+        : imageUri;
+
+      if (!srcToLoad.startsWith('blob:') && !srcToLoad.startsWith('data:')) {
         img.crossOrigin = 'anonymous';
       }
+
       img.onload = () => {
         try {
-          const canvas = document.createElement('canvas');
+          const MAX_DIM = 800;
+          let srcW = img.naturalWidth || img.width || 600;
+          let srcH = img.naturalHeight || img.height || 400;
+
+          let targetW = srcW;
+          let targetH = srcH;
+          if (targetW > MAX_DIM || targetH > MAX_DIM) {
+            if (targetW > targetH) {
+              targetH = Math.round((targetH * MAX_DIM) / targetW);
+              targetW = MAX_DIM;
+            } else {
+              targetW = Math.round((targetW * MAX_DIM) / targetH);
+              targetH = MAX_DIM;
+            }
+          }
+
           const is90or270 = rotation === 90 || rotation === 270;
-          canvas.width = is90or270 ? img.height : img.width;
-          canvas.height = is90or270 ? img.width : img.height;
+          const canvas = document.createElement('canvas');
+          canvas.width = is90or270 ? targetH : targetW;
+          canvas.height = is90or270 ? targetW : targetH;
 
           const ctx = canvas.getContext('2d');
           if (!ctx) {
-            resolve(existingBase64 || null);
+            done(existingBase64 || null);
             return;
           }
 
@@ -163,18 +154,18 @@ export async function getTransformedBase64(
           if (isFlipped) {
             ctx.scale(-1, 1);
           }
-          ctx.drawImage(img, -img.width / 2, -img.height / 2);
+          ctx.drawImage(img, -targetW / 2, -targetH / 2, targetW, targetH);
           ctx.restore();
 
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.78);
           const comma = dataUrl.indexOf(',');
-          resolve(comma !== -1 ? dataUrl.substring(comma + 1) : null);
+          done(comma !== -1 ? dataUrl.substring(comma + 1) : null);
         } catch {
-          resolve(existingBase64 || null);
+          done(existingBase64 || null);
         }
       };
-      img.onerror = () => resolve(existingBase64 || null);
-      img.src = imageUri;
+      img.onerror = () => done(existingBase64 || null);
+      img.src = srcToLoad;
     });
   }
 
@@ -230,6 +221,8 @@ export async function classifyFishPhoto(
       fleshState: 'prime',
     };
 
+    const aiPrice = (await GeminiPricingService.getPriceForSpecies(matched.id)) || undefined;
+
     return {
       topMatch: {
         species: matched,
@@ -245,6 +238,7 @@ export async function classifyFishPhoto(
       })),
       automatedFreshnessEstimate: freshnessInput,
       aiFreshnessResult: calculateFreshness(freshnessInput),
+      aiPrice,
       scanTimestamp: Date.now(),
       detectedWithAI: false,
     };
@@ -259,6 +253,8 @@ export async function classifyFishPhoto(
     skinState: 'prime',
     fleshState: 'prime',
   };
+
+  const defaultAiPrice = (await GeminiPricingService.getPriceForSpecies(defaultSpecies.id)) || undefined;
 
   return {
     topMatch: {
@@ -275,6 +271,7 @@ export async function classifyFishPhoto(
     })),
     automatedFreshnessEstimate: defaultFreshness,
     aiFreshnessResult: calculateFreshness(defaultFreshness),
+    aiPrice: defaultAiPrice,
     scanTimestamp: Date.now(),
     detectedWithAI: false,
     requiresApiKey: !isAiReady,

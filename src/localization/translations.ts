@@ -74,6 +74,9 @@ export const translations = {
       clearApiKey: 'Remove Key',
       geminiPoweredBadge: 'Identified with Google Gemini Vision',
       geminiKeyHint: 'Get a free key at aistudio.google.com',
+      aiMarketValuation: 'Gemini AI Market Valuation',
+      calculatePurchaseCost: 'Calculate Purchase Cost',
+      estimatedMarketPrice: 'Estimated Market Rate',
     },
     criteria: {
       eyes: {
@@ -124,6 +127,12 @@ export const translations = {
       marketPrice: 'Market Price Reference',
       customPrice: 'Update Local Price',
       saveCustomPrice: 'Save Custom Price',
+      aiMarketRateBadge: 'Gemini AI Live Market Benchmark',
+      refreshAiPrice: 'Refresh Live Rate with AI',
+      marketRange: 'Market Fluctuation Range',
+      fromPriceTo: 'From {min} to {max}',
+      marketNotes: 'AI Market Intelligence',
+      resetCustomPrice: 'Reset to AI Market Price',
     },
     calculator: {
       title: 'Market Weight-to-Price Calculator',
@@ -135,6 +144,13 @@ export const translations = {
       estimatedCost: 'Estimated Total Cost',
       vendorTips: 'Market Shopping Tip',
       tipText: 'Always check if gutting and cleaning reduces the gross scale weight by ~15-20% before finalizing the price with the vendor.',
+      aiMarketRateBadge: 'Gemini AI Live Market Benchmark',
+      refreshAiPrice: 'Update Live Rate with AI',
+      refreshingAiPrice: 'Querying Gemini for latest dockside rates...',
+      marketRange: 'Market Fluctuation Range',
+      fromPriceTo: 'From {min} to {max}',
+      marketNotes: 'AI Market Intelligence',
+      resetCustomPrice: 'Reset to AI Market Price',
     },
     settings: {
       title: 'Settings & Offline Storage',
@@ -239,6 +255,9 @@ export const translations = {
       clearApiKey: 'حذف کلید',
       geminiPoweredBadge: 'شناسایی هوشمند با Google Gemini Vision',
       geminiKeyHint: 'دریافت کلید رایگان از aistudio.google.com',
+      aiMarketValuation: 'برآورد ارزش و نرخ روز با هوش مصنوعی جمنای',
+      calculatePurchaseCost: 'محاسبه هزینه خرید این ماهی',
+      estimatedMarketPrice: 'نرخ برآوردی در بازار',
     },
     criteria: {
       eyes: {
@@ -289,6 +308,12 @@ export const translations = {
       marketPrice: 'میانگین قیمت روز در بازار',
       customPrice: 'ویرایش نرخ محلی',
       saveCustomPrice: 'ذخیره قیمت جدید',
+      aiMarketRateBadge: 'نرخ روز بازار بر اساس تحلیل هوش مصنوعی جمنای',
+      refreshAiPrice: 'استعلام زنده نرخ روز با هوش مصنوعی',
+      marketRange: 'بازه نوسان قیمت در اسکله و بازار',
+      fromPriceTo: 'از {min} تا {max}',
+      marketNotes: 'تحلیل هوشمند وضعیت بازار',
+      resetCustomPrice: 'بازگشت به نرخ هوش مصنوعی',
     },
     calculator: {
       title: 'محاسبه‌گر سریع قیمت بر اساس وزن',
@@ -300,6 +325,13 @@ export const translations = {
       estimatedCost: 'مبلغ کل برآوردی',
       vendorTips: 'نکته طلایی خرید از بازار',
       tipText: 'توجه داشته باشید که تمیزکردن و دورریز شکم معمولاً حدود ۱۵ تا ۲۰ درصد از وزن کل ماهی کسر می‌کند؛ پیش از پرداخت، قیمت خالص یا ناخالص را با فروشنده نهایی کنید.',
+      aiMarketRateBadge: 'نرخ روز بازار بر اساس تحلیل هوش مصنوعی جمنای',
+      refreshAiPrice: 'استعلام زنده نرخ روز با هوش مصنوعی',
+      refreshingAiPrice: 'در حال استعلام نرخ روز از بازار...',
+      marketRange: 'بازه نوسان قیمت در اسکله و بازار',
+      fromPriceTo: 'از {min} تا {max}',
+      marketNotes: 'تحلیل هوشمند وضعیت بازار',
+      resetCustomPrice: 'بازگشت به نرخ هوش مصنوعی',
     },
     settings: {
       title: 'تنظیمات و حافظه آفلاین',

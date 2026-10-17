@@ -155,10 +155,31 @@ export const FishCard: React.FC<FishCardProps> = ({ fish, onPress, onInspectPres
             ]}
           >
             <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center' }}>
-              <Ionicons name="pricetag" size={14} color={colors.primary} style={{ marginHorizontal: 3 }} />
-              <Text style={[styles.priceText, { color: colors.primary }]}>
+              <Ionicons
+                name={priceInfo.isAi ? 'sparkles' : 'pricetag'}
+                size={13}
+                color={priceInfo.isAi ? '#0284C7' : colors.primary}
+                style={{ marginHorizontal: 3 }}
+              />
+              <Text style={[styles.priceText, { color: priceInfo.isAi ? '#0284C7' : colors.primary }]}>
                 {formattedPrice} {t.home.perKg}
               </Text>
+              {priceInfo.isAi && (
+                <View
+                  style={{
+                    backgroundColor: 'rgba(2, 132, 199, 0.1)',
+                    paddingHorizontal: 5,
+                    paddingVertical: 1.5,
+                    borderRadius: 4,
+                    marginLeft: isRTL ? 0 : 5,
+                    marginRight: isRTL ? 5 : 0,
+                  }}
+                >
+                  <Text style={{ fontSize: 9.5, fontWeight: '700', color: '#0284C7' }}>
+                    {isRTL ? 'هوش مصنوعی' : 'AI Rate'}
+                  </Text>
+                </View>
+              )}
             </View>
 
             <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center' }}>

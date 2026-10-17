@@ -1,10 +1,73 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ALL_FISH_SPECIES } from '../../database/seedData';
 import { FishSpecies } from '../../database/schema';
 import { InspectionPrediction } from '../cv/speciesClassifier';
 import { calculateFreshness, FreshnessInput, FreshnessResult } from '../freshnessGrader';
+import { GeminiPricingService, AiFishPrice } from './geminiPricingService';
+import {
+  getGeminiApiKey,
+  saveGeminiApiKey,
+  isGeminiConfigured,
+  GEMINI_FLASH_MODELS,
+  GEMINI_STORAGE_KEY,
+} from './geminiConfig';
+import { SPECIES_EXTRA_ALIASES } from '../cv/speciesAliases';
 
-const GEMINI_STORAGE_KEY = '@fish_inspector_gemini_api_key';
+export { GEMINI_STORAGE_KEY };
+
+/**
+ * Resiliently maps any species name, ID, slug, Latin name, or dialect from Gemini to catalog.
+ */
+export function resolveSpeciesFromAiOutput(queryId: string): FishSpecies {
+  const qLower = (queryId || '').toLowerCase().trim();
+  const qClean = qLower.replace(/[^a-z0-9\u0600-\u06FF]/g, '');
+
+  // 1. Direct ID match
+  const byId = ALL_FISH_SPECIES.find(
+    (f) => f.id.toLowerCase() === qLower || f.id.toLowerCase() === qClean
+  );
+  if (byId) return byId;
+
+  // 2. Extra aliases match
+  for (const [id, aliases] of Object.entries(SPECIES_EXTRA_ALIASES)) {
+    if (id === qClean) {
+      const sp = ALL_FISH_SPECIES.find((f) => f.id === id);
+      if (sp) return sp;
+    }
+    for (const alias of aliases) {
+      const aliasClean = alias.toLowerCase().replace(/[^a-z0-9\u0600-\u06FF]/g, '');
+      if (aliasClean === qClean || qClean.includes(aliasClean) || aliasClean.includes(qClean)) {
+        const sp = ALL_FISH_SPECIES.find((f) => f.id === id);
+        if (sp) return sp;
+      }
+    }
+  }
+
+  // 3. Normalized slug check
+  const bySlug = ALL_FISH_SPECIES.find((f) => {
+    const slugClean = f.slug.toLowerCase().replace(/[^a-z0-9]/g, '');
+    return slugClean.includes(qClean) || qClean.includes(slugClean);
+  });
+  if (bySlug) return bySlug;
+
+  // 4. Substring in English name or scientific name or Persian name
+  const byName = ALL_FISH_SPECIES.find((f) => {
+    const enClean = f.nameEn.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const sciClean = (f.scientificName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const faClean = f.nameFa.replace(/[^a-z0-9\u0600-\u06FF]/g, '');
+    return (
+      enClean.includes(qClean) ||
+      qClean.includes(enClean) ||
+      sciClean.includes(qClean) ||
+      qClean.includes(sciClean) ||
+      faClean.includes(qClean) ||
+      qClean.includes(faClean)
+    );
+  });
+  if (byName) return byName;
+
+  // 5. Fallback: dolmi or first catalog item
+  return ALL_FISH_SPECIES.find((f) => f.id === 'dolmi') || ALL_FISH_SPECIES[0];
+}
 
 export interface GeminiFreshnessAssessment {
   score: number;
@@ -35,6 +98,14 @@ export interface GeminiClassificationResult {
   distinguishingFeaturesFa: string[];
   distinguishingFeaturesEn: string[];
   freshness: GeminiFreshnessAssessment;
+  pricing?: {
+    pricePerKgToman?: number;
+    pricePerKgUsd?: number;
+    minPriceToman?: number;
+    maxPriceToman?: number;
+    marketNotesFa?: string;
+    marketNotesEn?: string;
+  };
   alternatives?: {
     speciesId: string;
     confidence: number;
@@ -46,42 +117,21 @@ export class GeminiVisionService {
    * Retrieves the stored Gemini API key, checking AsyncStorage first, then environment variable.
    */
   static async getApiKey(): Promise<string | null> {
-    try {
-      const stored = await AsyncStorage.getItem(GEMINI_STORAGE_KEY);
-      if (stored && stored.trim().length > 0) return stored.trim();
-    } catch {
-      // Ignore storage read error
-    }
-
-    if (
-      typeof process !== 'undefined' &&
-      process.env &&
-      process.env.EXPO_PUBLIC_GEMINI_API_KEY
-    ) {
-      return process.env.EXPO_PUBLIC_GEMINI_API_KEY.trim();
-    }
-
-    return null;
+    return getGeminiApiKey();
   }
 
   /**
    * Saves the Gemini API key to local persistent storage.
    */
   static async saveApiKey(apiKey: string): Promise<void> {
-    const trimmed = apiKey.trim();
-    if (!trimmed) {
-      await AsyncStorage.removeItem(GEMINI_STORAGE_KEY);
-    } else {
-      await AsyncStorage.setItem(GEMINI_STORAGE_KEY, trimmed);
-    }
+    return saveGeminiApiKey(apiKey);
   }
 
   /**
    * Checks whether a valid Gemini API key is configured.
    */
   static async isConfigured(): Promise<boolean> {
-    const key = await this.getApiKey();
-    return !!key && key.length > 10;
+    return isGeminiConfigured();
   }
 
   /**
@@ -105,14 +155,12 @@ export class GeminiVisionService {
 
     const systemPrompt = `You are an elite marine ichthyologist and senior commercial fisheries quality inspector specializing in Persian Gulf, Caspian Sea, and commercial aquaculture species.
 
-Carefully examine this fish image and perform TWO tasks with extreme precision:
+Carefully examine this fish image and perform THREE tasks with extreme precision:
 1. SPECIES IDENTIFICATION: Match the fish strictly to ONE of the 46 known catalog species listed below.
 2. 4-POINT BIOLOGICAL FRESHNESS EVALUATION (FAO / Quality Index Method):
-   Analyze:
-   - Eyes: Pupil clarity (deep clear black vs cloudy/milky) & cornea (bulging convex vs flat/sunken).
-   - Gills: Bright crimson/red vs pale pink/brown/foul mucus.
-   - Skin & Scales: Metallic iridescent sheen, firmly adhering scales vs dull, dry, sloughing scales.
-   - Flesh & Belly: Firm elastic muscular resilience, intact belly vs soft, depressed or burst belly.
+   Analyze eyes, gills, skin & scales, flesh & belly.
+3. CURRENT COMMERCIAL MARKET PRICING:
+   Estimate realistic retail market price per kg in Iranian Toman and USD in Iranian seafood markets.
 
 CATALOG OF 46 KNOWN SPECIES:
 ${JSON.stringify(catalogSummary, null, 1)}
@@ -156,6 +204,14 @@ RETURN ONLY VALID RAW JSON WITH THIS EXACT STRUCTURE:
     "daysOnIceRemainingFa": "مدت زمان ماندگاری تخمینی در یخ به فارسی",
     "daysOnIceRemainingEn": "Estimated remaining shelf-life on ice in English"
   },
+  "pricing": {
+    "pricePerKgToman": <integer estimated price per kg in Toman>,
+    "pricePerKgUsd": <float estimated USD equivalent>,
+    "minPriceToman": <integer min price in Toman>,
+    "maxPriceToman": <integer max price in Toman>,
+    "marketNotesFa": "توضیح کوتاه وضعیت قیمت روز بازار در ایران",
+    "marketNotesEn": "Short market pricing note in English"
+  },
   "alternatives": [
     { "speciesId": "<alternative id 1>", "confidence": <integer> },
     { "speciesId": "<alternative id 2>", "confidence": <integer> }
@@ -164,10 +220,9 @@ RETURN ONLY VALID RAW JSON WITH THIS EXACT STRUCTURE:
 
 DO NOT output Markdown backticks or extra commentary. Return raw JSON only.`;
 
-    const models = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.5-flash', 'gemini-flash-latest'];
-
-    for (const model of models) {
+    for (const model of GEMINI_FLASH_MODELS) {
       try {
+        console.log(`[GeminiVision] Attempting model: ${model}...`);
         const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
         const payload = {
@@ -190,15 +245,22 @@ DO NOT output Markdown backticks or extra commentary. Return raw JSON only.`;
           },
         };
 
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 9000);
+
         const response = await fetch(endpoint, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(payload),
+          signal: controller.signal,
         });
+        clearTimeout(timeoutId);
 
         if (!response.ok) {
+          const errBody = await response.text().catch(() => '');
+          console.warn(`[GeminiVision] Model ${model} returned HTTP ${response.status}: ${errBody.substring(0, 150)}`);
           continue;
         }
 
@@ -206,18 +268,18 @@ DO NOT output Markdown backticks or extra commentary. Return raw JSON only.`;
         const textContent =
           data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
 
-        if (!textContent) continue;
+        if (!textContent) {
+          console.warn(`[GeminiVision] Model ${model} returned empty text content`);
+          continue;
+        }
 
+        console.log(`[GeminiVision] Model ${model} returned JSON (${textContent.length} chars)`);
         const cleanedJson = textContent.replace(/^```json\s*/i, '').replace(/```\s*$/i, '');
         const parsed: GeminiClassificationResult = JSON.parse(cleanedJson);
+        console.log(`[GeminiVision] Parsed speciesId: "${parsed.speciesId}", confidence: ${parsed.confidence}`);
 
-        const matchedSpecies =
-          ALL_FISH_SPECIES.find((f) => f.id === parsed.speciesId) ||
-          ALL_FISH_SPECIES.find(
-            (f) => f.slug.includes(parsed.speciesId) || parsed.speciesId.includes(f.id)
-          );
-
-        if (!matchedSpecies) continue;
+        const matchedSpecies = resolveSpeciesFromAiOutput(parsed.speciesId);
+        console.log(`[GeminiVision] Resolved to catalog species: "${matchedSpecies.id}" (${matchedSpecies.nameEn})`);
 
         // Build alternatives
         const alternatives: {
@@ -229,8 +291,12 @@ DO NOT output Markdown backticks or extra commentary. Return raw JSON only.`;
 
         if (parsed.alternatives && Array.isArray(parsed.alternatives)) {
           for (const alt of parsed.alternatives) {
-            const altSpecies = ALL_FISH_SPECIES.find((f) => f.id === alt.speciesId);
-            if (altSpecies && altSpecies.id !== matchedSpecies.id) {
+            const altSpecies = resolveSpeciesFromAiOutput(alt.speciesId);
+            if (
+              altSpecies &&
+              altSpecies.id !== matchedSpecies.id &&
+              !alternatives.some((a) => a.species.id === altSpecies.id)
+            ) {
               alternatives.push({
                 species: altSpecies,
                 confidence: alt.confidence || 45,
@@ -290,6 +356,24 @@ DO NOT output Markdown backticks or extra commentary. Return raw JSON only.`;
           parsed.freshness?.score
         );
 
+        let aiPrice: AiFishPrice | undefined;
+        if (parsed.pricing && parsed.pricing.pricePerKgToman && parsed.pricing.pricePerKgToman > 0) {
+          aiPrice = {
+            speciesId: matchedSpecies.id,
+            pricePerKgToman: Math.round(parsed.pricing.pricePerKgToman),
+            pricePerKgUsd: Math.round((parsed.pricing.pricePerKgUsd || parsed.pricing.pricePerKgToman / 85000) * 10) / 10,
+            minPriceToman: Math.round(parsed.pricing.minPriceToman || parsed.pricing.pricePerKgToman * 0.8),
+            maxPriceToman: Math.round(parsed.pricing.maxPriceToman || parsed.pricing.pricePerKgToman * 1.25),
+            marketNotesFa: parsed.pricing.marketNotesFa || 'برآورد هوش مصنوعی بر اساس رصد زنده تصویر صید',
+            marketNotesEn: parsed.pricing.marketNotesEn || 'AI live market estimate based on visual catch quality',
+            lastUpdated: Date.now(),
+            isAiEstimated: true,
+          };
+          GeminiPricingService.saveAiPrice(aiPrice).catch(() => {});
+        } else {
+          aiPrice = (await GeminiPricingService.getPriceForSpecies(matchedSpecies.id)) || undefined;
+        }
+
         return {
           topMatch: {
             species: matchedSpecies,
@@ -306,6 +390,7 @@ DO NOT output Markdown backticks or extra commentary. Return raw JSON only.`;
           alternatives,
           automatedFreshnessEstimate: freshnessInput,
           aiFreshnessResult,
+          aiPrice,
           scanTimestamp: Date.now(),
           detectedWithAI: true,
         };
@@ -362,11 +447,12 @@ RETURN ONLY RAW JSON:
   "daysOnIceRemainingEn": "Shelf life on ice in English"
 }`;
 
-    const models = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.5-flash', 'gemini-flash-latest'];
-
-    for (const model of models) {
+    for (const model of GEMINI_FLASH_MODELS) {
       try {
         const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 9000);
+
         const response = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -384,7 +470,9 @@ RETURN ONLY RAW JSON:
               response_mime_type: 'application/json',
             },
           }),
+          signal: controller.signal,
         });
+        clearTimeout(timeoutId);
 
         if (!response.ok) continue;
         const data = await response.json();

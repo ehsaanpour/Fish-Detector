@@ -31,7 +31,12 @@ yarn-error.*
 *.pem
 
 # local env files
+.env
+.env*
 .env*.local
+
+# temporary test scripts
+tests/test-*.ts
 
 # typescript
 *.tsbuildinfo

@@ -39,7 +39,7 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({
   onNavigateToCalculator,
 }) => {
   const { colors } = useAppTheme();
-  const { isRTL, t, formatNumber } = useAppLocale();
+  const { isRTL, t, formatNumber, formatCurrency } = useAppLocale();
 
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [imageMeta, setImageMeta] = useState<ImageAnalysisMeta | null>(null);
@@ -61,6 +61,7 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({
   const [showGeminiModal, setShowGeminiModal] = useState<boolean>(false);
   const [geminiKeyInput, setGeminiKeyInput] = useState<string>('');
   const [isUsedGemini, setIsUsedGemini] = useState<boolean>(false);
+  const [analyzingStageText, setAnalyzingStageText] = useState<string>('');
 
   useEffect(() => {
     let isMounted = true;
@@ -75,6 +76,10 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({
     };
   }, []);
 
+  const handleCancelAnalysis = () => {
+    setIsAnalyzing(false);
+  };
+
   const performClassification = async (
     uri: string,
     meta?: ImageAnalysisMeta,
@@ -82,22 +87,106 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({
     flipped: boolean = false
   ) => {
     setIsAnalyzing(true);
+    setAnalyzingStageText(t.scanner.identifying);
+
+    const stepTimer1 = setTimeout(() => {
+      setAnalyzingStageText(
+        isRTL ? 'در حال ارسال تصویر به هوش مصنوعی Google Gemini...' : 'Sending photo to Google Gemini Vision AI...'
+      );
+    }, 2000);
+
+    const stepTimer2 = setTimeout(() => {
+      setAnalyzingStageText(
+        isRTL
+          ? 'تحلیل دقیق نشانه‌های زیستی، باله‌ها، آبشش و تازگی...'
+          : 'Evaluating biological features, fins, gills & freshness...'
+      );
+    }, 5000);
+
+    // 14-second hard safety timeout so the UI NEVER gets stuck indefinitely
+    const timeoutPromise = new Promise<null>((resolve) => {
+      setTimeout(() => resolve(null), 14000);
+    });
+
     try {
-      const pred = await classifyFishPhoto(uri, meta?.fileName, meta, {
+      const predPromise = classifyFishPhoto(uri, meta?.fileName, meta, {
         rotation: rot,
         isFlipped: flipped,
       });
-      setPrediction(pred);
-      setIsManuallyOverridden(false);
-      setIsUsedGemini(pred.detectedWithAI);
-      if (pred.requiresApiKey) {
-        setShowGeminiModal(true);
+
+      const pred = await Promise.race([predPromise, timeoutPromise]);
+
+      clearTimeout(stepTimer1);
+      clearTimeout(stepTimer2);
+
+      if (pred) {
+        setPrediction(pred);
+        setIsManuallyOverridden(false);
+        setIsUsedGemini(pred.detectedWithAI);
+        if (pred.requiresApiKey) {
+          setShowGeminiModal(true);
+        }
+      } else {
+        // Fallback gracefully without calling network AI again
+        const fallbackSpecies = ALL_FISH_SPECIES.find((f) => f.id === 'dolmi') || ALL_FISH_SPECIES[0];
+        const defaultFreshness = {
+          eyeState: 'prime' as const,
+          gillState: 'prime' as const,
+          skinState: 'prime' as const,
+          fleshState: 'prime' as const,
+        };
+        const fallbackPred: InspectionPrediction = {
+          topMatch: {
+            species: fallbackSpecies,
+            confidence: 50,
+            distinguishingFeaturesEn: fallbackSpecies.physicalFeaturesEn,
+            distinguishingFeaturesFa: fallbackSpecies.physicalFeaturesFa,
+          },
+          alternatives: ALL_FISH_SPECIES.filter((f) => f.id !== fallbackSpecies.id).slice(0, 2).map((s) => ({
+            species: s,
+            confidence: 40,
+            distinguishingFeaturesEn: s.physicalFeaturesEn,
+            distinguishingFeaturesFa: s.physicalFeaturesFa,
+          })),
+          automatedFreshnessEstimate: defaultFreshness,
+          aiFreshnessResult: calculateFreshness(defaultFreshness),
+          scanTimestamp: Date.now(),
+          detectedWithAI: false,
+        };
+        setPrediction(fallbackPred);
+        setShowSpeciesModal(true);
       }
     } catch {
-      // In case of error, retry with safe default
-      const fallbackPred = await classifyFishPhoto(uri);
-      setPrediction(fallbackPred);
+      clearTimeout(stepTimer1);
+      clearTimeout(stepTimer2);
+      const fallbackSpecies = ALL_FISH_SPECIES.find((f) => f.id === 'dolmi') || ALL_FISH_SPECIES[0];
+      const defaultFreshness = {
+        eyeState: 'prime' as const,
+        gillState: 'prime' as const,
+        skinState: 'prime' as const,
+        fleshState: 'prime' as const,
+      };
+      setPrediction({
+        topMatch: {
+          species: fallbackSpecies,
+          confidence: 50,
+          distinguishingFeaturesEn: fallbackSpecies.physicalFeaturesEn,
+          distinguishingFeaturesFa: fallbackSpecies.physicalFeaturesFa,
+        },
+        alternatives: ALL_FISH_SPECIES.filter((f) => f.id !== fallbackSpecies.id).slice(0, 2).map((s) => ({
+          species: s,
+          confidence: 40,
+          distinguishingFeaturesEn: s.physicalFeaturesEn,
+          distinguishingFeaturesFa: s.physicalFeaturesFa,
+        })),
+        automatedFreshnessEstimate: defaultFreshness,
+        aiFreshnessResult: calculateFreshness(defaultFreshness),
+        scanTimestamp: Date.now(),
+        detectedWithAI: false,
+      });
     } finally {
+      clearTimeout(stepTimer1);
+      clearTimeout(stepTimer2);
       setIsAnalyzing(false);
     }
   };
@@ -107,7 +196,7 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({
       const pickerOptions = {
         mediaTypes: ['images' as const],
         allowsEditing: false,
-        quality: 0.85,
+        quality: 0.65,
         base64: true,
       };
 
@@ -163,9 +252,6 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({
         await performClassification(uri, meta, 0, false);
       }
     } catch {
-      setIsAnalyzing(true);
-      const pred = await classifyFishPhoto('local_simulated_scan');
-      setPrediction(pred);
       setIsAnalyzing(false);
     }
   };
@@ -364,11 +450,23 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({
             {/* AR Framing Overlay Guidelines (headSide adapts to flip) */}
             <FramingGuide headSide={isFlipped ? 'right' : 'left'} />
 
-            {/* Analyzing Spinner Overlay */}
+            {/* Analyzing Spinner Overlay with dynamic status and Cancel button */}
             {isAnalyzing && (
               <View style={styles.loadingScrim}>
                 <ActivityIndicator size="large" color={colors.primary} />
-                <Text style={styles.loadingText}>{t.scanner.identifying}</Text>
+                <Text style={[styles.loadingText, { textAlign: 'center', paddingHorizontal: 20 }]}>
+                  {analyzingStageText || t.scanner.identifying}
+                </Text>
+                <TouchableOpacity
+                  style={[styles.cancelAnalyzingBtn, { backgroundColor: colors.surface }]}
+                  onPress={handleCancelAnalysis}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="close-circle-outline" size={15} color={colors.textSecondary} />
+                  <Text style={[styles.cancelAnalyzingText, { color: colors.textSecondary }]}>
+                    {isRTL ? 'انصراف' : 'Cancel'}
+                  </Text>
+                </TouchableOpacity>
               </View>
             )}
           </View>
@@ -724,6 +822,81 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({
                 </View>
               )}
 
+              {/* Gemini AI Live Market Valuation Card */}
+              {prediction.aiPrice && (
+                <View
+                  style={[
+                    styles.aiPriceScanCard,
+                    {
+                      backgroundColor: colors.surfaceSubtle,
+                      borderColor: '#0284C7',
+                    },
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.aiPriceScanHeader,
+                      { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                    ]}
+                  >
+                    <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
+                      <Ionicons name="sparkles" size={15} color="#0284C7" />
+                      <Text style={[styles.aiPriceScanTitle, { color: colors.textPrimary }]}>
+                        {t.scanner.aiMarketValuation}
+                      </Text>
+                    </View>
+
+                    <Text style={[styles.aiPriceScanRate, { color: '#0284C7' }]}>
+                      {formatCurrency(prediction.aiPrice.pricePerKgToman, 'toman')} {t.home.perKg}
+                    </Text>
+                  </View>
+
+                  {/* Price Range */}
+                  <View
+                    style={[
+                      styles.aiPriceScanRangeRow,
+                      { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                    ]}
+                  >
+                    <Ionicons name="analytics-outline" size={13} color={colors.textMuted} />
+                    <Text style={[styles.aiPriceScanRangeText, { color: colors.textMuted }]}>
+                      {isRTL ? 'نوسان بازار:' : 'Market Range:'} {formatCurrency(prediction.aiPrice.minPriceToman, 'toman')} {isRTL ? 'تا' : 'to'} {formatCurrency(prediction.aiPrice.maxPriceToman, 'toman')} {t.home.perKg}
+                    </Text>
+                  </View>
+
+                  {/* Market Note */}
+                  {Boolean(isRTL ? prediction.aiPrice.marketNotesFa : prediction.aiPrice.marketNotesEn) && (
+                    <Text
+                      style={[
+                        styles.aiPriceScanNotes,
+                        { color: colors.textSecondary, textAlign: isRTL ? 'right' : 'left' },
+                      ]}
+                    >
+                      💡 {isRTL ? prediction.aiPrice.marketNotesFa : prediction.aiPrice.marketNotesEn}
+                    </Text>
+                  )}
+
+                  {/* 1-Tap Calculate Purchase Cost Button */}
+                  <TouchableOpacity
+                    style={[
+                      styles.aiPriceScanCalcBtn,
+                      {
+                        backgroundColor: colors.surface,
+                        borderColor: '#0284C7',
+                        flexDirection: isRTL ? 'row-reverse' : 'row',
+                      },
+                    ]}
+                    onPress={() => onNavigateToCalculator(prediction.topMatch.species)}
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name="calculator" size={15} color="#0284C7" />
+                    <Text style={[styles.aiPriceScanCalcText, { color: '#0284C7' }]}>
+                      {t.scanner.calculatePurchaseCost}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
               {/* Action Buttons: 4-Point Freshness Grader & Detail */}
               <View style={styles.actionRow}>
                 <TouchableOpacity
@@ -1059,6 +1232,19 @@ const styles = StyleSheet.create({
   loadingText: {
     color: '#F8FAFC',
     fontSize: 13,
+    fontWeight: '700',
+  },
+  cancelAnalyzingBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 10,
+    marginTop: 8,
+  },
+  cancelAnalyzingText: {
+    fontSize: 12,
     fontWeight: '700',
   },
   orientationToolbar: {
@@ -1482,5 +1668,49 @@ const styles = StyleSheet.create({
   geminiClearBtnText: {
     fontSize: 13,
     fontWeight: '700',
+  },
+  aiPriceScanCard: {
+    marginTop: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 12,
+    gap: 8,
+  },
+  aiPriceScanHeader: {
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  aiPriceScanTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  aiPriceScanRate: {
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  aiPriceScanRangeRow: {
+    alignItems: 'center',
+    gap: 5,
+  },
+  aiPriceScanRangeText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  aiPriceScanNotes: {
+    fontSize: 11.5,
+    lineHeight: 17,
+  },
+  aiPriceScanCalcBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 9,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginTop: 4,
+  },
+  aiPriceScanCalcText: {
+    fontSize: 12,
+    fontWeight: '800',
   },
 });
