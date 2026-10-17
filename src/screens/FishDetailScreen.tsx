@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  Alert,
 } from 'react-native';
 import { FishSpecies } from '../database/schema';
 import { useAppTheme } from '../theme/ThemeContext';
@@ -30,7 +29,7 @@ export const FishDetailScreen: React.FC<FishDetailScreenProps> = ({
   onNavigateToCalculator,
 }) => {
   const { colors } = useAppTheme();
-  const { isRTL, t, formatCurrency, formatNumber } = useAppLocale();
+  const { isRTL, t, formatCurrency } = useAppLocale();
   const { currency, getPriceForFish, updateCustomPrice } = useAppCurrency();
 
   const [isBookmarked, setIsBookmarked] = useState(false);

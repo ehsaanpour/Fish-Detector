@@ -80,14 +80,20 @@ export const FishImage: React.FC<FishImageProps> = ({
 
   return (
     <View style={[styles.container, { borderRadius }]}>
-      <Image
-        source={imageSource}
-        style={[styles.image, { borderRadius }, style]}
-        resizeMode={resizeMode}
-        onLoadStart={() => setLoading(true)}
-        onLoadEnd={() => setLoading(false)}
-        onError={() => setHasError(true)}
-      />
+      {hasError ? (
+        <View style={[styles.image, { borderRadius, backgroundColor: '#1E293B', alignItems: 'center', justifyContent: 'center' }, style]}>
+          <Text style={{ color: '#94A3B8', fontSize: 14 }}>🐟</Text>
+        </View>
+      ) : (
+        <Image
+          source={imageSource}
+          style={[styles.image, { borderRadius }, style]}
+          resizeMode={resizeMode}
+          onLoadStart={() => setLoading(true)}
+          onLoadEnd={() => setLoading(false)}
+          onError={() => setHasError(true)}
+        />
+      )}
 
       {loading && (
         <View style={styles.loaderWrap}>

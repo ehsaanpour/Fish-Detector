@@ -6,7 +6,6 @@ import {
   TextInput,
   ScrollView,
   TouchableOpacity,
-  FlatList,
 } from 'react-native';
 import { useAppTheme } from '../theme/ThemeContext';
 import { useAppLocale } from '../localization/LocaleContext';
@@ -46,10 +45,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const filteredSpecies = useMemo(() => {
     return dbService.searchSpecies(searchQuery, selectedCategory);
   }, [searchQuery, selectedCategory]);
-
-  const featuredFish = useMemo(() => {
-    return dbService.getSpeciesById('zobaidi') || dbService.getAllSpecies()[0];
-  }, []);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>

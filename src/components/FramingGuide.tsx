@@ -3,9 +3,15 @@ import { View, Text, StyleSheet } from 'react-native';
 import { useAppTheme } from '../theme/ThemeContext';
 import { useAppLocale } from '../localization/LocaleContext';
 
-export const FramingGuide: React.FC = () => {
+interface FramingGuideProps {
+  headSide?: 'left' | 'right';
+}
+
+export const FramingGuide: React.FC<FramingGuideProps> = ({ headSide = 'left' }) => {
   const { colors } = useAppTheme();
   const { isRTL, t } = useAppLocale();
+
+  const isHeadRight = headSide === 'right';
 
   return (
     <View style={styles.overlayContainer} pointerEvents="none">
@@ -24,16 +30,34 @@ export const FramingGuide: React.FC = () => {
         <View style={[styles.corner, styles.bottomLeft, { borderColor: colors.primary }]} />
         <View style={[styles.corner, styles.bottomRight, { borderColor: colors.primary }]} />
 
-        {/* Anatomical Inspection Targets */}
-        <View style={[styles.focalTarget, styles.eyeTarget, { borderColor: '#EF4444' }]}>
+        {/* Anatomical Inspection Targets (adaptive to fish head orientation) */}
+        <View
+          style={[
+            styles.focalTarget,
+            isHeadRight ? styles.eyeTargetRight : styles.eyeTargetLeft,
+            { borderColor: '#EF4444' },
+          ]}
+        >
           <Text style={styles.focalLabel}>{isRTL ? 'چشم' : 'Eye'}</Text>
         </View>
 
-        <View style={[styles.focalTarget, styles.gillTarget, { borderColor: '#F59E0B' }]}>
+        <View
+          style={[
+            styles.focalTarget,
+            isHeadRight ? styles.gillTargetRight : styles.gillTargetLeft,
+            { borderColor: '#F59E0B' },
+          ]}
+        >
           <Text style={styles.focalLabel}>{isRTL ? 'آبشش' : 'Gill'}</Text>
         </View>
 
-        <View style={[styles.focalTarget, styles.bodyTarget, { borderColor: '#10B981' }]}>
+        <View
+          style={[
+            styles.focalTarget,
+            isHeadRight ? styles.bodyTargetRight : styles.bodyTargetLeft,
+            { borderColor: '#10B981' },
+          ]}
+        >
           <Text style={styles.focalLabel}>{isRTL ? 'پوست و پولک' : 'Scales'}</Text>
         </View>
 
@@ -119,18 +143,32 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     borderWidth: 1.5,
     borderStyle: 'dashed',
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
   },
-  eyeTarget: {
+  // Head on Left positions
+  eyeTargetLeft: {
     left: 24,
     top: 60,
   },
-  gillTarget: {
+  gillTargetLeft: {
     left: 70,
     top: 50,
   },
-  bodyTarget: {
+  bodyTargetLeft: {
     right: 50,
+    top: 90,
+  },
+  // Head on Right positions
+  eyeTargetRight: {
+    right: 24,
+    top: 60,
+  },
+  gillTargetRight: {
+    right: 70,
+    top: 50,
+  },
+  bodyTargetRight: {
+    left: 50,
     top: 90,
   },
   focalLabel: {

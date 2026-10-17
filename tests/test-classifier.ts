@@ -114,7 +114,56 @@ async function runTests() {
   }
   console.log('✅ Passed: Mahi-Mahi (ماهی عنزه / ماهی‌ماهی) successfully identified!');
 
-  console.log('\n🎉 ALL 12 CLASSIFIER VERIFICATION TESTS PASSED!');
+  // Test 13: Great Barracuda with English file name "barracuda.jpg" (User reported issue!)
+  console.log('\n[TEST 13] Testing Great Barracuda (Dolmi / Kootar) with "barracuda.jpg"...');
+  const cudaPred = await classifyFishPhoto('blob:http://localhost:8081/upload_barracuda', 'barracuda.jpg');
+  console.log(`Top match: ${cudaPred.topMatch.species.nameFa} (${cudaPred.topMatch.species.id}) - Confidence: ${cudaPred.topMatch.confidence}%`);
+  if (cudaPred.topMatch.species.id !== 'dolmi') {
+    throw new Error(`Expected dolmi (Great Barracuda), got ${cudaPred.topMatch.species.id}`);
+  }
+  console.log('✅ Passed: Barracuda successfully matched to ماهی دولمی (کوتر)!');
+
+  // Test 14: Persian name "ماهی_کوتر_بوشهر.jpg"
+  console.log('\n[TEST 14] Testing Persian name (ماهی_کوتر_بوشهر.jpg)...');
+  const kootarPred = await classifyFishPhoto('assets/fish/dolmi.jpg', 'ماهی_کوتر_بوشهر.jpg');
+  console.log(`Top match: ${kootarPred.topMatch.species.nameFa} (${kootarPred.topMatch.species.id}) - Confidence: ${kootarPred.topMatch.confidence}%`);
+  if (kootarPred.topMatch.species.id !== 'dolmi') {
+    throw new Error(`Expected dolmi, got ${kootarPred.topMatch.species.id}`);
+  }
+  console.log('✅ Passed: Persian dialect کوتر recognized!');
+
+  // Test 15: Anonymous Barracuda upload with slender morphology (aspectRatio: 4.2)
+  console.log('\n[TEST 15] Testing Anonymous Barracuda silhouette upload (slender needle body AR 4.2)...');
+  const anonCuda = await classifyFishPhoto('blob:http://localhost:8081/camera_0192.jpg', 'IMG_0192.jpg', {
+    width: 840,
+    height: 200, // AR 4.2 - typical of Barracuda/Dolmi
+  });
+  console.log(`Top match: ${anonCuda.topMatch.species.nameFa} (${anonCuda.topMatch.species.id}) - Confidence: ${anonCuda.topMatch.confidence}%`);
+  console.log('Alternatives:', anonCuda.alternatives.map(a => `${a.species.nameFa} (${a.confidence}%)`));
+  if (!['dolmi', 'kharoo', 'shir'].includes(anonCuda.topMatch.species.id)) {
+    throw new Error(`Expected needle-body fish (dolmi, kharoo, or shir), got ${anonCuda.topMatch.species.id}`);
+  }
+  // Ensure it's NEVER classified as Cod!
+  if (anonCuda.topMatch.species.id === 'cod') {
+    throw new Error(`CRITICAL: Slender needle fish was mistakenly classified as Cod!`);
+  }
+  console.log('✅ Passed: Anonymous needle-silhouette fish correctly mapped to pelagic predator (NOT Cod)!');
+
+  // Test 16: Orientation & Flip Invariance (head on right vs left)
+  console.log('\n[TEST 16] Testing Horizontal Flip & 90deg Rotation parameter passing...');
+  const flippedPred = await classifyFishPhoto(
+    'blob:http://localhost:8081/camera_flipped.jpg',
+    'barracuda_flipped.jpg',
+    { width: 840, height: 200 },
+    { rotation: 90, isFlipped: true }
+  );
+  console.log(`Top match with rotation 90 & flip: ${flippedPred.topMatch.species.nameFa} (${flippedPred.topMatch.species.id})`);
+  if (flippedPred.topMatch.species.id !== 'dolmi') {
+    throw new Error(`Expected dolmi, got ${flippedPred.topMatch.species.id}`);
+  }
+  console.log('✅ Passed: Orientation and flipping correctly processed!');
+
+  console.log('\n🎉 ALL 16 CLASSIFIER VERIFICATION TESTS PASSED!');
 }
 
 runTests().catch((err) => {

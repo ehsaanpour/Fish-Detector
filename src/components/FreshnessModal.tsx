@@ -56,12 +56,13 @@ export const FreshnessModal: React.FC<FreshnessModalProps> = ({
     fleshState,
   });
 
-  const handleSave = async () => {
+  const handleSave = React.useCallback(async () => {
+    const now = Date.now();
     const record: InspectionRecord = {
-      id: `insp_${Date.now()}`,
+      id: `insp_${now}`,
       fishId: fish.id,
       fishName: isRTL ? fish.nameFa : fish.nameEn,
-      timestamp: Date.now(),
+      timestamp: now,
       freshnessScore: result.score,
       grade: result.grade,
       eyeScore: result.scoresBreakdown.eyes,
@@ -74,7 +75,7 @@ export const FreshnessModal: React.FC<FreshnessModalProps> = ({
     await dbService.saveInspection(record);
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 2500);
-  };
+  }, [fish.id, fish.nameEn, fish.nameFa, isRTL, result]);
 
   const organTabs = [
     { key: 'eyes', label: t.scanner.eyes, icon: 'eye' },
