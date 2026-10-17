@@ -39,24 +39,26 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
         font-display: block;
       }
 
-      html, body, #root {
+      /* 1. Global typography: All text across the UI uses Vazirmatn */
+      *, *::before, *::after {
         font-family: 'Vazirmatn', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      }
+
+      html, body, #root, [class*="css-text"], div, span, p, h1, h2, h3, h4, h5, h6, input, textarea, select, button {
+        font-family: 'Vazirmatn', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
       }
 
-      input, textarea, select, button {
-        font-family: 'Vazirmatn', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      }
-
-      /* Protect vector icon glyphs from inheriting body font */
-      [style*="font-family: ionicons"],
-      [style*="font-family: Ionicons"],
-      [style*='font-family: "ionicons"'],
-      [style*='font-family: "Ionicons"'],
-      [style*="font-family: 'ionicons'"],
-      [style*="font-family: 'Ionicons'"] {
-        font-family: 'ionicons', 'Ionicons' !important;
+      /* 2. Exception: Vector icon glyphs ALWAYS use Ionicons font */
+      [style*="ionicons" i],
+      [style*="Ionicons" i],
+      [class*="css-text"][style*="ionicons" i],
+      [class*="css-text"][style*="Ionicons" i],
+      [class*="fontFamily-ionicons" i],
+      [class*="fontFamily-Ionicons" i],
+      .r-fontFamily-b91m1e {
+        font-family: 'Ionicons', 'ionicons' !important;
       }
     `;
     document.head.appendChild(style);
