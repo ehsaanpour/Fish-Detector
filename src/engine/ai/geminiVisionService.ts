@@ -164,7 +164,7 @@ RETURN ONLY VALID RAW JSON WITH THIS EXACT STRUCTURE:
 
 DO NOT output Markdown backticks or extra commentary. Return raw JSON only.`;
 
-    const models = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash'];
+    const models = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.5-flash', 'gemini-flash-latest'];
 
     for (const model of models) {
       try {
@@ -362,7 +362,7 @@ RETURN ONLY RAW JSON:
   "daysOnIceRemainingEn": "Shelf life on ice in English"
 }`;
 
-    const models = ['gemini-2.5-flash', 'gemini-1.5-flash'];
+    const models = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.5-flash', 'gemini-flash-latest'];
 
     for (const model of models) {
       try {
