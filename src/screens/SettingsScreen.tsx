@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   TextInput,
   Linking,
+  Image,
+  Platform,
 } from 'react-native';
 import { useAppTheme } from '../theme/ThemeContext';
 import { useAppLocale } from '../localization/LocaleContext';
@@ -29,6 +31,20 @@ export const SettingsScreen: React.FC = () => {
   const [isGeminiActive, setIsGeminiActive] = useState(false);
   const [geminiSavedMsg, setGeminiSavedMsg] = useState(false);
   const [showGuide, setShowGuide] = useState(true);
+
+  // Donation State
+  const [copiedAddress, setCopiedAddress] = useState(false);
+  const DONATION_ADDRESS = '0xc29E57776eCE95129740eFC97f3d20ac74Cc0a17';
+
+  const handleCopyAddress = () => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(DONATION_ADDRESS);
+    }
+    setCopiedAddress(true);
+    setTimeout(() => {
+      setCopiedAddress(false);
+    }, 3000);
+  };
 
   useEffect(() => {
     (async () => {
@@ -531,12 +547,124 @@ export const SettingsScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* Scientific Authority & About Section */}
+        {/* About & Creator Section */}
         <View style={styles.sectionWrap}>
           <Text style={[styles.sectionTitle, { color: colors.textPrimary, textAlign: isRTL ? 'right' : 'left' }]}>
             {t.settings.about}
           </Text>
 
+          {/* Creator & 100% Free Software Card */}
+          <View style={[styles.statusCard, { backgroundColor: colors.surface, borderColor: colors.primary, marginBottom: 12 }]}>
+            <View
+              style={[
+                styles.statusHeader,
+                { flexDirection: isRTL ? 'row-reverse' : 'row' },
+              ]}
+            >
+              <View style={[styles.creatorAvatar, { backgroundColor: colors.primary }]}>
+                <Ionicons name="person" size={20} color="#FFFFFF" />
+              </View>
+              <View style={{ flex: 1, paddingHorizontal: 6, alignItems: isRTL ? 'flex-end' : 'flex-start' }}>
+                <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 8 }}>
+                  <Text style={[styles.statusTitle, { color: colors.textPrimary, fontSize: 15 }]}>
+                    {t.settings.creatorName}
+                  </Text>
+                  <View style={[styles.freeBadge, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.2)' : 'rgba(16, 185, 129, 0.15)' }]}>
+                    <Text style={[styles.freeBadgeText, { color: colors.success }]}>
+                      {isRTL ? '۱۰۰٪ رایگان' : '100% Free'}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={{ fontSize: 11, color: colors.textMuted, marginTop: 2 }}>
+                  {t.settings.creatorTitle}
+                </Text>
+              </View>
+            </View>
+
+            <Text style={[styles.statusDesc, { color: colors.textSecondary, textAlign: isRTL ? 'right' : 'left', marginTop: 4, lineHeight: 20 }]}>
+              {t.settings.creatorDesc}
+            </Text>
+          </View>
+
+          {/* Donation & Support Card with QR Code */}
+          <View style={[styles.statusCard, { backgroundColor: colors.surface, borderColor: colors.borderSubtle, marginBottom: 12 }]}>
+            <View
+              style={[
+                styles.statusHeader,
+                { flexDirection: isRTL ? 'row-reverse' : 'row' },
+              ]}
+            >
+              <Ionicons name="heart" size={22} color="#EC4899" />
+              <View style={{ flex: 1, paddingHorizontal: 4, alignItems: isRTL ? 'flex-end' : 'flex-start' }}>
+                <Text style={[styles.statusTitle, { color: colors.textPrimary }]}>
+                  {t.settings.donationTitle}
+                </Text>
+                <Text style={{ fontSize: 11, color: colors.accentTeal, fontWeight: '700', marginTop: 1 }}>
+                  {t.settings.donationNetwork}
+                </Text>
+              </View>
+            </View>
+
+            <Text style={[styles.statusDesc, { color: colors.textSecondary, textAlign: isRTL ? 'right' : 'left', lineHeight: 18 }]}>
+              {t.settings.donationDesc}
+            </Text>
+
+            {/* Exact QR Code Image Container */}
+            <View style={styles.qrCardContainer}>
+              <View style={styles.qrImageFrame}>
+                <Image
+                  source={require('../../assets/donation_qr.jpg')}
+                  style={styles.donationQrImage}
+                  resizeMode="contain"
+                />
+              </View>
+            </View>
+
+            {/* Wallet Address Display & Copy */}
+            <View style={[styles.walletAddressBox, { backgroundColor: colors.surfaceSubtle, borderColor: colors.borderSubtle }]}>
+              <Text style={{ fontSize: 10, color: colors.textMuted, textAlign: isRTL ? 'right' : 'left', fontWeight: '700', marginBottom: 4 }}>
+                {isRTL ? 'آدرس کیف‌پول تتر (USDT - BEP20):' : 'USDT (BEP20) Deposit Address:'}
+              </Text>
+              <Text
+                selectable={true}
+                style={[styles.walletAddressText, { color: colors.textPrimary }]}
+              >
+                {DONATION_ADDRESS}
+              </Text>
+            </View>
+
+            {/* Copy Button */}
+            <TouchableOpacity
+              style={[
+                styles.copyAddressBtn,
+                {
+                  backgroundColor: copiedAddress ? colors.success : colors.primary,
+                  flexDirection: isRTL ? 'row-reverse' : 'row',
+                },
+              ]}
+              onPress={handleCopyAddress}
+              activeOpacity={0.8}
+            >
+              <Ionicons
+                name={copiedAddress ? 'checkmark-circle' : 'copy-outline'}
+                size={18}
+                color="#FFFFFF"
+              />
+              <Text style={styles.copyAddressBtnText}>
+                {copiedAddress ? t.settings.addressCopied : t.settings.copyAddress}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Network Warning Note */}
+            <View style={[styles.donationWarningCard, { backgroundColor: isDark ? 'rgba(239, 68, 68, 0.1)' : 'rgba(239, 68, 68, 0.08)', borderColor: 'rgba(239, 68, 68, 0.3)' }]}>
+              <Ionicons name="alert-circle-outline" size={16} color="#EF4444" />
+              <Text style={[styles.donationWarningText, { textAlign: isRTL ? 'right' : 'left' }]}>
+                {t.settings.donationWarning}
+              </Text>
+            </View>
+          </View>
+
+          {/* Scientific Authority & Maritime Reference */}
           <View style={[styles.statusCard, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}>
             <View
               style={[
@@ -731,5 +859,90 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 11,
     lineHeight: 16,
+  },
+  creatorAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  freeBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  freeBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  qrCardContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 12,
+  },
+  qrImageFrame: {
+    backgroundColor: '#FFFFFF',
+    padding: 10,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  donationQrImage: {
+    width: 240,
+    height: 290,
+    borderRadius: 8,
+  },
+  walletAddressBox: {
+    borderRadius: 10,
+    borderWidth: 1,
+    padding: 10,
+    marginVertical: 6,
+  },
+  walletAddressText: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+    textAlign: 'center',
+    fontFamily: Platform.select({
+      ios: 'Menlo',
+      android: 'monospace',
+      default: 'monospace',
+    }),
+  },
+  copyAddressBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 10,
+    gap: 8,
+    marginVertical: 4,
+  },
+  copyAddressBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  donationWarningCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    padding: 8,
+    marginTop: 6,
+  },
+  donationWarningText: {
+    flex: 1,
+    color: '#EF4444',
+    fontSize: 10.5,
+    lineHeight: 15,
   },
 });
