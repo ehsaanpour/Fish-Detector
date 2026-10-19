@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, Image } from 'react-native';
 import { useAppTheme } from '../theme/ThemeContext';
 import { useAppLocale } from '../localization/LocaleContext';
 import { useAppCurrency } from '../localization/CurrencyContext';
@@ -37,12 +37,12 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
         style={[
           styles.titleContainer,
           {
-            alignItems: isRTL ? 'flex-end' : 'flex-start',
+            alignItems: 'center',
             flexDirection: isRTL ? 'row-reverse' : 'row',
           },
         ]}
       >
-        {showBack && (
+        {showBack ? (
           <TouchableOpacity
             onPress={onBack}
             style={[styles.backButton, isRTL ? { marginLeft: 10 } : { marginRight: 10 }]}
@@ -54,6 +54,12 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
               color={colors.primary}
             />
           </TouchableOpacity>
+        ) : (
+          <Image
+            source={require('../../assets/app_logo.png')}
+            style={[styles.appLogo, isRTL ? { marginLeft: 10 } : { marginRight: 10 }]}
+            resizeMode="contain"
+          />
         )}
         <View style={{ alignItems: isRTL ? 'flex-end' : 'flex-start' }}>
           <Text style={[styles.title, { color: colors.textPrimary, textAlign: isRTL ? 'right' : 'left' }]}>
@@ -126,6 +132,11 @@ const styles = StyleSheet.create({
   },
   backButton: {
     padding: 4,
+  },
+  appLogo: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
   },
   title: {
     fontSize: 18,

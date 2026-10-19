@@ -553,6 +553,21 @@ export const SettingsScreen: React.FC = () => {
             {t.settings.about}
           </Text>
 
+          {/* App Branding Card */}
+          <View style={[styles.statusCard, { backgroundColor: colors.surface, borderColor: colors.borderSubtle, marginBottom: 12, alignItems: 'center', paddingVertical: 18 }]}>
+            <Image
+              source={require('../../assets/app_logo.png')}
+              style={{ width: 76, height: 76, borderRadius: 18 }}
+              resizeMode="contain"
+            />
+            <Text style={{ fontSize: 17, fontWeight: '800', color: colors.textPrimary, marginTop: 10 }}>
+              {t.appName}
+            </Text>
+            <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 3 }}>
+              {t.appSubtitle} • v1.0.1
+            </Text>
+          </View>
+
           {/* Creator & 100% Free Software Card */}
           <View style={[styles.statusCard, { backgroundColor: colors.surface, borderColor: colors.primary, marginBottom: 12 }]}>
             <View
