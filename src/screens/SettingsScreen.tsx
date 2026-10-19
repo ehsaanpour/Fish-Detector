@@ -564,7 +564,7 @@ export const SettingsScreen: React.FC = () => {
               {t.appName}
             </Text>
             <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 3 }}>
-              {t.appSubtitle} • v1.0.1
+              {t.appSubtitle} • v1.0.2
             </Text>
           </View>
 

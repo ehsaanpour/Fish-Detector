@@ -118,7 +118,12 @@ jobs:
             cp "android/app/build/outputs/apk/debug/app-debug.apk" "release-artifacts/Market-Fish-Inspector-${TAG}-debug.apk"
           fi
 
-          echo "Generated APKs:"
+          # Copy Cafe Bazaar store icon
+          if [ -f "assets/bazaar-icon-512.png" ]; then
+            cp "assets/bazaar-icon-512.png" "release-artifacts/bazaar-icon-512.png"
+          fi
+
+          echo "Generated Artifacts:"
           ls -lh release-artifacts/
 
           # Generate SHA256 Checksums
@@ -143,17 +148,19 @@ jobs:
           files: |
             release-artifacts/*.apk
             release-artifacts/SHA256SUMS.txt
+            release-artifacts/*.png
           body: |
             ## Market Fish Inspector (تشخیص هوشمند ماهی و سنجش تازگی)
 
             Automated compilation for version **${{ steps.vars.outputs.tag }}** from commit `${{ github.sha }}`.
 
-            ### 📱 Download Android APKs (Assets):
+            ### 📱 Download Android APKs & Assets:
             - 🌟 **`Market-Fish-Inspector-${{ steps.vars.outputs.tag }}-universal.apk`**: **Universal APK** (Compatible with ALL Android devices — **Recommended**).
             - ⚡ **`Market-Fish-Inspector-${{ steps.vars.outputs.tag }}-arm64-v8a.apk`**: Optimized for modern 64-bit Android smartphones.
             - 📦 **`Market-Fish-Inspector-${{ steps.vars.outputs.tag }}-armeabi-v7a.apk`**: Optimized for older 32-bit Android phones.
             - 💻 **`Market-Fish-Inspector-${{ steps.vars.outputs.tag }}-x86_64.apk`**: Optimized for Android emulators and ChromeOS tablets.
             - 🛠️ **`Market-Fish-Inspector-${{ steps.vars.outputs.tag }}-debug.apk`**: Developer debug build.
+            - 🏪 **`bazaar-icon-512.png`**: Official Cafe Bazaar standard 512x512 store icon.
 
             ### 🔐 Integrity Checksums:
             Checksums are provided in `SHA256SUMS.txt`.

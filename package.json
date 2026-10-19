@@ -1,6 +1,6 @@
 {
   "name": "fish-market-inspector",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "main": "index.ts",
   "dependencies": {
     "@expo-google-fonts/vazirmatn": "^0.4.1",
