@@ -1,4 +1,6 @@
-import { Platform, Text, TextInput } from 'react-native';
+import React from 'react';
+import { Platform, StyleSheet } from 'react-native';
+import * as RN from 'react-native';
 
 // On Web, inject the Google Fonts link and global font-family rule immediately
 if (Platform.OS === 'web' && typeof document !== 'undefined') {
@@ -65,6 +67,7 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
   }
 }
 
+
 // Set default font for React Native Text components across all platforms
 const defaultFontFamily = Platform.select({
   web: 'Vazirmatn, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
@@ -73,20 +76,104 @@ const defaultFontFamily = Platform.select({
   default: 'Vazirmatn',
 });
 
-try {
-  const customTextProps = (Text as any).defaultProps || {};
-  (Text as any).defaultProps = {
-    ...customTextProps,
-    style: [{ fontFamily: defaultFontFamily }, customTextProps.style],
-  };
+export const resolveVazirmatnFont = (style: any) => {
+  const flat = StyleSheet.flatten(style) || {};
+  const fam = flat.fontFamily ? String(flat.fontFamily) : '';
 
-  const customTextInputProps = (TextInput as any).defaultProps || {};
-  (TextInput as any).defaultProps = {
-    ...customTextInputProps,
-    style: [{ fontFamily: defaultFontFamily }, customTextInputProps.style],
-  };
+  // Preserve vector icons and other third-party icon fonts completely untouched
+  if (
+    fam &&
+    !fam.startsWith('Vazirmatn') &&
+    (fam.includes('Ionicons') ||
+      fam.includes('ionicons') ||
+      fam.includes('Material') ||
+      fam.includes('FontAwesome') ||
+      fam.includes('Feather') ||
+      fam.includes('Entypo') ||
+      fam.includes('Octicons') ||
+      fam.includes('AntDesign'))
+  ) {
+    return {};
+  }
+
+  // If a Vazirmatn family variant is already specified, just ensure Android fontWeight is normalized
+  if (fam && fam.startsWith('Vazirmatn')) {
+    return Platform.OS === 'android' ? { fontWeight: 'normal' as const } : {};
+  }
+
+  // On Web, standard font-family CSS handles weights
+  if (Platform.OS === 'web') {
+    return { fontFamily: 'Vazirmatn, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' };
+  }
+
+  // On Native (Android / iOS), resolve font variant by weight
+  const weight = flat.fontWeight ? String(flat.fontWeight) : '400';
+  let targetFont = 'Vazirmatn_400Regular';
+
+  if (weight === 'bold' || weight === '700') {
+    targetFont = 'Vazirmatn_700Bold';
+  } else if (weight === '800' || weight === '900') {
+    targetFont = 'Vazirmatn_800ExtraBold';
+  } else if (weight === '600') {
+    targetFont = 'Vazirmatn_600SemiBold';
+  } else if (weight === '500') {
+    targetFont = 'Vazirmatn_500Medium';
+  } else if (weight === '300' || weight === '100' || weight === '200' || weight === 'light') {
+    targetFont = 'Vazirmatn_300Light';
+  }
+
+  // On Android, if fontFamily is a specific weight name (like Vazirmatn_700Bold),
+  // leaving fontWeight: 'bold' / '700' causes React Native Android to search for Vazirmatn_700Bold_bold
+  // which does not exist and leads to fallback. Overriding fontWeight to 'normal' ensures correct rendering.
+  return Platform.OS === 'android'
+    ? { fontFamily: targetFont, fontWeight: 'normal' as const }
+    : { fontFamily: targetFont };
+};
+
+const OriginalText = RN.Text;
+const OriginalTextInput = RN.TextInput;
+
+// Global Text Interceptor
+const PatchedText = React.forwardRef<any, RN.TextProps>((props, ref) => {
+  const fontOverrides = resolveVazirmatnFont(props.style);
+  if (Object.keys(fontOverrides).length === 0) {
+    return React.createElement(OriginalText, { ref, ...props });
+  }
+  return React.createElement(OriginalText, { ref, ...props, style: [props.style, fontOverrides] });
+});
+PatchedText.displayName = 'PatchedText';
+Object.assign(PatchedText, OriginalText);
+
+// Global TextInput Interceptor
+const PatchedTextInput = React.forwardRef<any, RN.TextInputProps>((props, ref) => {
+  const fontOverrides = resolveVazirmatnFont(props.style);
+  if (Object.keys(fontOverrides).length === 0) {
+    return React.createElement(OriginalTextInput, { ref, ...props });
+  }
+  return React.createElement(OriginalTextInput, { ref, ...props, style: [props.style, fontOverrides] });
+});
+PatchedTextInput.displayName = 'PatchedTextInput';
+Object.assign(PatchedTextInput, OriginalTextInput);
+
+// Monkeypatch react-native export getters so every component gets the patched text
+try {
+  Object.defineProperty(RN, 'Text', {
+    configurable: true,
+    enumerable: true,
+    get() {
+      return PatchedText;
+    },
+  });
+  Object.defineProperty(RN, 'TextInput', {
+    configurable: true,
+    enumerable: true,
+    get() {
+      return PatchedTextInput;
+    },
+  });
 } catch {
-  // Ignore in environments where defaultProps is frozen
+  (RN as any).Text = PatchedText;
+  (RN as any).TextInput = PatchedTextInput;
 }
 
 export const typography = {

@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
+  Linking,
 } from 'react-native';
 import { useAppTheme } from '../theme/ThemeContext';
 import { useAppLocale } from '../localization/LocaleContext';
@@ -17,7 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export const SettingsScreen: React.FC = () => {
-  const { colors, mode, setMode } = useAppTheme();
+  const { colors, mode, setMode, isDark } = useAppTheme();
   const { isRTL, locale, setLocale, t, formatNumber } = useAppLocale();
   const { currency, setCurrency } = useAppCurrency();
 
@@ -27,6 +28,7 @@ export const SettingsScreen: React.FC = () => {
   const [geminiKey, setGeminiKey] = useState('');
   const [isGeminiActive, setIsGeminiActive] = useState(false);
   const [geminiSavedMsg, setGeminiSavedMsg] = useState(false);
+  const [showGuide, setShowGuide] = useState(true);
 
   useEffect(() => {
     (async () => {
@@ -145,9 +147,161 @@ export const SettingsScreen: React.FC = () => {
               )}
             </View>
 
-            <Text style={{ fontSize: 11, color: colors.primary, marginTop: 4, textAlign: isRTL ? 'right' : 'left', fontWeight: '600' }}>
-              {isRTL ? 'دریافت کلید رایگان از: aistudio.google.com/apikey' : 'Get free key at: aistudio.google.com/apikey'}
-            </Text>
+            {/* Direct Active Link to Google AI Studio */}
+            <TouchableOpacity
+              style={[
+                styles.geminiLinkBtn,
+                {
+                  backgroundColor: isDark ? 'rgba(2, 132, 199, 0.15)' : 'rgba(2, 132, 199, 0.08)',
+                  borderColor: colors.primary,
+                  flexDirection: isRTL ? 'row-reverse' : 'row',
+                },
+              ]}
+              onPress={() => Linking.openURL('https://aistudio.google.com/app/apikey')}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.linkIconCircle, { backgroundColor: colors.primary }]}>
+                <Ionicons name="open-outline" size={16} color="#FFFFFF" />
+              </View>
+              <View style={{ flex: 1, paddingHorizontal: 8 }}>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    fontWeight: '700',
+                    color: colors.primary,
+                    textAlign: isRTL ? 'right' : 'left',
+                  }}
+                >
+                  {isRTL ? 'ورود مستقیم به Google AI Studio (لمس کنید)' : 'Open Google AI Studio (Tap Here)'}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 10,
+                    color: colors.textSecondary,
+                    textAlign: isRTL ? 'right' : 'left',
+                    marginTop: 2,
+                  }}
+                >
+                  https://aistudio.google.com/app/apikey
+                </Text>
+              </View>
+              <Ionicons name={isRTL ? 'chevron-back' : 'chevron-forward'} size={18} color={colors.primary} />
+            </TouchableOpacity>
+
+            {/* Toggle Guide Button */}
+            <TouchableOpacity
+              style={[
+                styles.guideToggleBtn,
+                {
+                  borderColor: colors.borderSubtle,
+                  flexDirection: isRTL ? 'row-reverse' : 'row',
+                },
+              ]}
+              onPress={() => setShowGuide(!showGuide)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="help-circle-outline" size={16} color={colors.textSecondary} />
+              <Text
+                style={{
+                  fontSize: 11,
+                  color: colors.textSecondary,
+                  fontWeight: '600',
+                  flex: 1,
+                  textAlign: isRTL ? 'right' : 'left',
+                }}
+              >
+                {isRTL ? 'راهنمای دریافت کلید رایگان (۴ مرحله)' : 'Step-by-step key setup guide (4 steps)'}
+              </Text>
+              <Ionicons
+                name={showGuide ? 'chevron-up' : 'chevron-down'}
+                size={16}
+                color={colors.textSecondary}
+              />
+            </TouchableOpacity>
+
+            {/* Detailed 4-Step Instructions Card */}
+            {showGuide && (
+              <View
+                style={[
+                  styles.guideContainer,
+                  {
+                    backgroundColor: colors.surfaceSubtle,
+                    borderColor: colors.borderSubtle,
+                  },
+                ]}
+              >
+                <View style={[styles.stepItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                  <View style={[styles.stepBadge, { backgroundColor: colors.primary }]}>
+                    <Text style={styles.stepBadgeText}>{isRTL ? '۱' : '1'}</Text>
+                  </View>
+                  <Text style={[styles.stepText, { color: colors.textPrimary, textAlign: isRTL ? 'right' : 'left' }]}>
+                    {isRTL
+                      ? 'روی دکمه آبی‌رنگ بالا ضربه بزنید تا صفحه دریافت کلید گوگل باز شود (با حساب گوگل یا جیمیل خود وارد شوید).'
+                      : 'Tap the blue button above to open Google AI Studio and sign in with your Google / Gmail account.'}
+                  </Text>
+                </View>
+
+                <View style={[styles.stepItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                  <View style={[styles.stepBadge, { backgroundColor: colors.primary }]}>
+                    <Text style={styles.stepBadgeText}>{isRTL ? '۲' : '2'}</Text>
+                  </View>
+                  <Text style={[styles.stepText, { color: colors.textPrimary, textAlign: isRTL ? 'right' : 'left' }]}>
+                    {isRTL
+                      ? 'دکمه آبی‌رنگ «Create API key» یا «Get API key» را در بالای صفحه لمس کنید.'
+                      : 'Click the blue "Create API key" button at the top of the Google AI Studio page.'}
+                  </Text>
+                </View>
+
+                <View style={[styles.stepItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                  <View style={[styles.stepBadge, { backgroundColor: colors.primary }]}>
+                    <Text style={styles.stepBadgeText}>{isRTL ? '۳' : '3'}</Text>
+                  </View>
+                  <Text style={[styles.stepText, { color: colors.textPrimary, textAlign: isRTL ? 'right' : 'left' }]}>
+                    {isRTL
+                      ? 'گزینه ایجاد در پروژه جدید را زده و کلید تولیدشده (رشته حروف و اعداد) را کپی (Copy) نمایید (این کلید کاملاً رایگان است).'
+                      : 'Create the key in a project and copy the resulting string (100% free with no credit card required).'}
+                  </Text>
+                </View>
+
+                <View style={[styles.stepItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                  <View style={[styles.stepBadge, { backgroundColor: colors.primary }]}>
+                    <Text style={styles.stepBadgeText}>{isRTL ? '۴' : '4'}</Text>
+                  </View>
+                  <Text style={[styles.stepText, { color: colors.textPrimary, textAlign: isRTL ? 'right' : 'left' }]}>
+                    {isRTL
+                      ? 'به همین صفحه بازگردید، کلید را در کادر متنی بالا جای‌گذاری (Paste) کنید و دکمه «ذخیره کلید API» را بزنید.'
+                      : 'Return to this app, paste the copied key into the input above, and tap "Save API Key".'}
+                  </Text>
+                </View>
+
+                {/* Important Network Note for Iran / Region */}
+                <View
+                  style={[
+                    styles.noteCard,
+                    {
+                      backgroundColor: isDark ? 'rgba(245, 158, 11, 0.1)' : 'rgba(245, 158, 11, 0.12)',
+                      borderColor: '#F59E0B',
+                      flexDirection: isRTL ? 'row-reverse' : 'row',
+                    },
+                  ]}
+                >
+                  <Ionicons name="information-circle-outline" size={18} color="#F59E0B" />
+                  <Text
+                    style={[
+                      styles.noteText,
+                      {
+                        color: colors.textPrimary,
+                        textAlign: isRTL ? 'right' : 'left',
+                      },
+                    ]}
+                  >
+                    {isRTL
+                      ? 'نکته: در صورت عدم باز شدن سایت گوگل استودیو در ایران، لطفاً از ابزار تغییر آی‌پی (VPN یا DNS مناسب) استفاده فرمایید.'
+                      : 'Note: Access to Google AI Studio may require a VPN or DNS depending on local ISP restrictions.'}
+                  </Text>
+                </View>
+              </View>
+            )}
           </View>
         </View>
 
@@ -511,5 +665,71 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '700',
+  },
+  geminiLinkBtn: {
+    borderRadius: 12,
+    borderWidth: 1.5,
+    padding: 10,
+    alignItems: 'center',
+    marginVertical: 4,
+  },
+  linkIconCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  guideToggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginTop: 2,
+    gap: 6,
+  },
+  guideContainer: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 12,
+    marginTop: 6,
+    gap: 10,
+  },
+  stepItem: {
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  stepBadge: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 1,
+  },
+  stepBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  stepText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  noteCard: {
+    borderRadius: 8,
+    borderWidth: 1,
+    padding: 8,
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 2,
+  },
+  noteText: {
+    flex: 1,
+    fontSize: 11,
+    lineHeight: 16,
   },
 });

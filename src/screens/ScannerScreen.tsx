@@ -10,6 +10,7 @@ import {
   Modal,
   TextInput,
   FlatList,
+  Linking,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useAppTheme } from '../theme/ThemeContext';
@@ -38,7 +39,7 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({
   onSelectFish,
   onNavigateToCalculator,
 }) => {
-  const { colors } = useAppTheme();
+  const { colors, isDark } = useAppTheme();
   const { isRTL, t, formatNumber, formatCurrency } = useAppLocale();
 
   const [imageUri, setImageUri] = useState<string | null>(null);
@@ -1133,9 +1134,50 @@ export const ScannerScreen: React.FC<ScannerScreenProps> = ({
               />
             </View>
 
-            <Text style={[styles.geminiHintText, { color: colors.primary, textAlign: isRTL ? 'right' : 'left' }]}>
-              {t.scanner.geminiKeyHint}
-            </Text>
+            {/* Direct Active Link to Google AI Studio */}
+            <TouchableOpacity
+              style={[
+                styles.geminiModalLinkBtn,
+                {
+                  backgroundColor: isDark ? 'rgba(2, 132, 199, 0.15)' : 'rgba(2, 132, 199, 0.08)',
+                  borderColor: colors.primary,
+                  flexDirection: isRTL ? 'row-reverse' : 'row',
+                },
+              ]}
+              onPress={() => Linking.openURL('https://aistudio.google.com/app/apikey')}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="open-outline" size={16} color={colors.primary} />
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: colors.primary,
+                  fontWeight: '700',
+                  flex: 1,
+                  textAlign: isRTL ? 'right' : 'left',
+                }}
+              >
+                {isRTL ? 'دریافت کلید رایگان از Google AI Studio (کلیک کنید)' : 'Get Free Key at Google AI Studio (Tap Here)'}
+              </Text>
+              <Ionicons name={isRTL ? 'chevron-back' : 'chevron-forward'} size={14} color={colors.primary} />
+            </TouchableOpacity>
+
+            {/* Quick 3-Step Guide */}
+            <View
+              style={[
+                styles.geminiModalGuide,
+                {
+                  backgroundColor: colors.surfaceSubtle,
+                  borderColor: colors.borderSubtle,
+                },
+              ]}
+            >
+              <Text style={[styles.geminiModalGuideText, { color: colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>
+                {isRTL
+                  ? '۱. روی دکمه آبی بالا بزنید و با جیمیل وارد شوید.\n۲. دکمه «Create API key» را بزنید و کلید را کپی کنید.\n۳. کلید را در کادر بالا چسبانده و دکمه ذخیره را بزنید.\n(در صورت نیاز در ایران از VPN یا DNS استفاده فرمایید)'
+                  : '1. Tap the button above & sign in with Gmail.\n2. Click "Create API key" and copy the key.\n3. Paste it in the box above and tap Save.\n(Note: May require VPN depending on your ISP)'}
+              </Text>
+            </View>
 
             <View style={styles.modalActionRow}>
               <TouchableOpacity
@@ -1641,6 +1683,26 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     marginBottom: 16,
+  },
+  geminiModalLinkBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 10,
+  },
+  geminiModalGuide: {
+    borderRadius: 10,
+    borderWidth: 1,
+    padding: 10,
+    marginBottom: 14,
+  },
+  geminiModalGuideText: {
+    fontSize: 11,
+    lineHeight: 18,
   },
   modalActionRow: {
     gap: 8,
